@@ -260,8 +260,9 @@ async def to_code(configs):
     df.add_define("LV_USE_LIBPNG", "0")  # PNG support via pngdec (not libpng)
     df.add_define("LV_USE_BMP", "1")      # BMP support
     df.add_define("LV_USE_GIF", "1")      # GIF support (built-in gifdec decoder)
-    # LVGL 9.5: Native WebP decoder via ThorVG (no external libwebp needed)
-    df.add_define("LV_USE_LIBWEBP", "1")
+    # WebP: LV_USE_LIBWEBP requires external libwebp (not available on ESP32).
+    # WebP decoding is handled by ThorVG's built-in WebP loader instead.
+    df.add_define("LV_USE_LIBWEBP", "0")
     # Add pngdec library for PNG decoding (lightweight, no external deps)
     cg.add_library("pngdec", "1.0.1")
 
