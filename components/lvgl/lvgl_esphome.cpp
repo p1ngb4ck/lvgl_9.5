@@ -373,7 +373,9 @@ LVEncoderListener::LVEncoderListener(lv_indev_type_t type, uint16_t long_press_t
     auto *l = static_cast<LVEncoderListener *>(lv_indev_get_user_data(d));
     data->state = l->pressed_ ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
     data->key = l->key_;
-    data->enc_diff = (int16_t) (l->count_ - l->last_count_);
+    // LVGL 9.5: Apply rotary sensitivity multiplier
+    auto raw_diff = (int16_t) (l->count_ - l->last_count_);
+    data->enc_diff = (int16_t) (raw_diff * l->sensitivity_);
     l->last_count_ = l->count_;
     data->continue_reading = false;
   });
@@ -565,6 +567,11 @@ void LvglComponent::setup() {
   if (frac == 0)
     frac = 1;
   auto buf_bytes = width * height / frac * LV_COLOR_DEPTH / 8;
+  // Fix for issue #9868: Align buffer size to 64 bytes for PPA/cache compatibility
+  // on ESP32-P4. esp_cache_msync() requires both address AND size to be cache-line
+  // aligned (64 bytes). Without this, PPA operations fail on PSRAM buffers.
+  constexpr size_t BUF_SIZE_ALIGN = 64;
+  buf_bytes = (buf_bytes + BUF_SIZE_ALIGN - 1) & ~(BUF_SIZE_ALIGN - 1);
   void *buffer = nullptr;
   // CRITICAL: Always use lv_malloc_core() which guarantees 64-byte alignment
   // Don't use malloc() as it may not be aligned correctly for LVGL 9.5

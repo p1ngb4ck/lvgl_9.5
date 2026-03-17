@@ -354,6 +354,9 @@ class LVEncoderListener : public Parented<LvglComponent> {
     }
   }
 
+  // LVGL 9.5: Set rotary encoder sensitivity multiplier
+  void set_sensitivity(float sensitivity) { this->sensitivity_ = sensitivity; }
+
   lv_indev_t *get_drv() { return this->drv_; }
 
  protected:
@@ -362,6 +365,7 @@ class LVEncoderListener : public Parented<LvglComponent> {
   int32_t count_{};
   int32_t last_count_{};
   int key_{};
+  float sensitivity_{1.0f};
 };
 #endif  //  USE_LVGL_KEY_LISTENER
 

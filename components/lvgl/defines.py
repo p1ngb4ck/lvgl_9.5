@@ -698,6 +698,35 @@ CONF_WIDGET = "widget"
 CONF_WIDGETS = "widgets"
 CONF_ZOOM = "zoom"
 
+# LVGL 9.5 blur / frosted glass properties
+CONF_BLUR_RADIUS = "blur_radius"
+CONF_BLUR_BACKDROP = "blur_backdrop"
+CONF_BLUR_QUALITY = "blur_quality"
+
+# LVGL 9.5 gradient opacity properties
+CONF_BG_MAIN_OPA = "bg_main_opa"
+CONF_BG_GRAD_OPA = "bg_grad_opa"
+
+# LVGL 9.5 image properties
+CONF_IMAGE_OPA = "image_opa"
+
+# LVGL 9.5 bitmap mask
+CONF_BITMAP_MASK_SRC = "bitmap_mask_src"
+
+# LVGL 9.5 margin properties (for flex/grid layouts)
+CONF_MARGIN_TOP = "margin_top"
+CONF_MARGIN_BOTTOM = "margin_bottom"
+CONF_MARGIN_LEFT = "margin_left"
+CONF_MARGIN_RIGHT = "margin_right"
+
+# LVGL 9.5 text outline properties
+CONF_TEXT_OUTLINE_COLOR = "text_outline_color"
+CONF_TEXT_OUTLINE_OPA = "text_outline_opa"
+CONF_TEXT_OUTLINE_WIDTH = "text_outline_width"
+
+# LVGL 9.5 rotary encoder sensitivity
+CONF_ROTARY_SENSITIVITY = "rotary_sensitivity"
+
 # Transition properties for animated state changes
 CONF_STYLE_TRANSITION_TIME = "style_transition_time"
 CONF_STYLE_TRANSITION_DELAY = "style_transition_delay"

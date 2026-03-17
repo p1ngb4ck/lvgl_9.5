@@ -260,8 +260,8 @@ async def to_code(configs):
     df.add_define("LV_USE_LIBPNG", "0")  # PNG support via pngdec (not libpng)
     df.add_define("LV_USE_BMP", "1")      # BMP support
     df.add_define("LV_USE_GIF", "1")      # GIF support (built-in gifdec decoder)
-    # WebP decoder (requires external libwebp - not enabled by default on ESP32)
-    # df.add_define("LV_USE_LIBWEBP", "1")  # Uncomment if libwebp is available
+    # LVGL 9.5: Native WebP decoder via ThorVG (no external libwebp needed)
+    df.add_define("LV_USE_LIBWEBP", "1")
     # Add pngdec library for PNG decoding (lightweight, no external deps)
     cg.add_library("pngdec", "1.0.1")
 
@@ -274,6 +274,9 @@ async def to_code(configs):
     # Bézier curved charts (LV_CHART_TYPE_CURVE) require Vector Graphics (ThorVG above)
     # LV_STATE_ALT - new widget state for dark/light mode switching
     # LV_OBJ_FLAG_RADIO_BUTTON - new flag for radio group behavior
+
+    # LVGL 9.5: Enable blur/frosted glass support
+    df.add_define("LV_USE_DRAW_SW_BLUR", "1")
 
     df.add_define(
         "LV_LOG_LEVEL",
