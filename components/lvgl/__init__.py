@@ -407,6 +407,7 @@ async def to_code(configs):
         "IMAGE": "IMG",
         "IMAGEBUTTON": "IMGBTN",
         "ANIMIMAGE": "ANIMIMG",
+        "SPANGROUP": "SPAN",
         "METER": "SCALE",
     }
     # All canonical LV_USE_* widget define names in LVGL v9.x
