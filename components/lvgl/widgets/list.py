@@ -70,7 +70,7 @@ class ListType(WidgetType):
                     lv.list_add_text(w.obj, text_value)
 
     def get_uses(self):
-        return ("btn", "label")
+        return ("btn", "label", "img")
 
 
 list_spec = ListType()
