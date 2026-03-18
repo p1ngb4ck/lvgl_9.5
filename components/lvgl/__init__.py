@@ -211,6 +211,11 @@ async def to_code(configs):
     cg.add_library("lvgl/lvgl", "9.5.0")
     cg.add_define("USE_LVGL")
 
+    # Add build filter to exclude LVGL platform code not needed for ESP32
+    # This reduces compilation time and binary size significantly
+    build_filter_script = Path(__file__).parent / "lvgl_build_filter.py"
+    cg.add_platformio_option("extra_scripts", [f"pre:{build_filter_script}"])
+
     # Define ESPHOME_ENTITY_BUTTON_COUNT for ESPHome core compatibility
     # This is required by application.h even when not using button entities
     cg.add_define("ESPHOME_ENTITY_BUTTON_COUNT", 0)
@@ -235,45 +240,24 @@ async def to_code(configs):
     df.add_define("LV_USE_STDLIB_MALLOC", "LV_STDLIB_CUSTOM")
 
     # ============================================
-    # THORVG + SVG/LOTTIE SUPPORT (LVGL v9.5+)
+    # FEATURES DISABLED BY DEFAULT (enabled conditionally below)
     # ============================================
-    # Enable floating point support (required by matrix)
-    df.add_define("LV_USE_FLOAT", "1")
-    # Enable matrix support (required by vector graphics)
-    df.add_define("LV_USE_MATRIX", "1")
-    # Enable vector graphics support (required for SVG/Lottie)
-    df.add_define("LV_USE_VECTOR_GRAPHIC", "1")
-    # Enable ThorVG vector graphics engine (built-in to LVGL v9)
-    df.add_define("LV_USE_THORVG_INTERNAL", "1")
-    # ThorVG optimizations for ESP32
-    df.add_define("LV_VG_LITE_THORVG_16PIXELS_ALIGN", "1")  # Optimize for 16-pixel alignment
+    # ThorVG, SVG, Lottie, Vector Graphics, Float, Matrix are ONLY
+    # enabled when the user actually uses svg: or lottie: widgets.
+    # This saves ~500KB-1MB of flash on ESP32 devices with limited storage.
+    # The conditional activation happens after widget processing (see below).
+
+    # Explicitly disable heavy features by default - they are enabled
+    # conditionally after widget processing if the user actually needs them.
+    df.add_define("LV_USE_LIBPNG", "0")
+    df.add_define("LV_USE_LIBWEBP", "0")
+
     # Enable FreeRTOS threading for LVGL draw operations
     # Note: atomic.h shim added in components/lvgl/ for ESP-IDF compatibility
     df.add_define("LV_USE_OS", "LV_OS_FREERTOS")
-    # Draw thread stack size - 48KB for ThorVG rendering
-    df.add_define("LV_DRAW_THREAD_STACK_SIZE", "(48 * 1024)")
-    # Enable SVG support (requires ThorVG)
-    df.add_define("LV_USE_SVG", "1")
-    # Enable Lottie animation support (requires ThorVG)
-    df.add_define("LV_USE_LOTTIE", "1")
-    # Enable advanced image decoders
-    df.add_define("LV_USE_LIBPNG", "0")  # PNG support via pngdec (not libpng)
-    df.add_define("LV_USE_BMP", "1")      # BMP support
-    df.add_define("LV_USE_GIF", "1")      # GIF support (built-in gifdec decoder)
-    # WebP decoder (requires external libwebp - not enabled by default on ESP32)
-    # df.add_define("LV_USE_LIBWEBP", "1")  # Uncomment if libwebp is available
-    # Add pngdec library for PNG decoding (lightweight, no external deps)
-    cg.add_library("pngdec", "1.0.1")
 
-    # ============================================
-    # LVGL 9.5 NEW FEATURES
-    # ============================================
-    # Native blur & drop shadow - enabled by default in SW renderer
-    # Shadow styles (shadow_width, shadow_color, shadow_opa, shadow_spread,
-    # shadow_offset_x, shadow_offset_y) work natively on all targets
-    # Bézier curved charts (LV_CHART_TYPE_CURVE) require Vector Graphics (ThorVG above)
-    # LV_STATE_ALT - new widget state for dark/light mode switching
-    # LV_OBJ_FLAG_RADIO_BUTTON - new flag for radio group behavior
+    # LVGL 9.5: Enable blur/frosted glass support (small code, useful for shadows)
+    df.add_define("LV_USE_DRAW_SW_BLUR", "1")
 
     df.add_define(
         "LV_LOG_LEVEL",
@@ -401,11 +385,110 @@ async def to_code(configs):
         "transform_scale_y",
     } & styles_used:
         df.add_define("LV_COLOR_SCREEN_TRANSP", "1")
+    # ============================================
+    # LV_USE_* WIDGET DEFINES
+    # ============================================
+    # LVGL's lv_conf_internal.h defaults LV_USE_<WIDGET>=1 for all widgets.
+    # lv_theme_default.c references widget _class symbols guarded by these defines.
+    # If we exclude a widget's source file via the build filter but don't set
+    # LV_USE_<WIDGET>=0, the theme still references the symbol -> linker error.
+    #
+    # IMPORTANT: Use CANONICAL define names (the ones with #ifndef guards in
+    # lv_conf_internal.h). LVGL v9.x uses short names as canonical and creates
+    # aliases for long names:
+    #   #ifndef LV_USE_BTN -> canonical (we can override)
+    #   #define LV_USE_BUTTON LV_USE_BTN -> alias (cannot override without warning)
+    #
+    # ESPHome lv_uses may contain both long names (from widget self.name, e.g. "button")
+    # and short names (from get_uses(), e.g. "btn"). Map all to canonical.
+    _TO_CANONICAL = {
+        "BUTTON": "BTN",
+        "BUTTONMATRIX": "BTNMATRIX",
+        "IMAGE": "IMG",
+        "IMAGEBUTTON": "IMGBTN",
+        "ANIMIMAGE": "ANIMIMG",
+        "METER": "SCALE",
+    }
+    # All canonical LV_USE_* widget define names in LVGL v9.x
+    _ALL_CANONICAL_WIDGETS = {
+        "ANIMIMG", "ARC", "BAR", "BTN", "BTNMATRIX",
+        "CALENDAR", "CANVAS", "CHART", "CHECKBOX", "DROPDOWN",
+        "IMG", "IMGBTN", "KEYBOARD", "LABEL", "LED",
+        "LINE", "LIST", "MENU", "MSGBOX", "ROLLER", "SCALE",
+        "SLIDER", "SPAN", "SPINBOX", "SPINNER", "SWITCH",
+        "TABLE", "TABVIEW", "TEXTAREA", "TILEVIEW", "WIN",
+    }
+
+    # Add ESPHome-specific defines; add LV_USE_* only for non-widget entries
     for use in helpers.lv_uses:
-        df.add_define(f"LV_USE_{use.upper()}")
-        cg.add_define(f"USE_LVGL_{use.upper()}")
-        # Also add the base USE_ define for ESPHome components (e.g., USE_FONT)
-        cg.add_define(f"USE_{use.upper()}")
+        upper = use.upper()
+        cg.add_define(f"USE_LVGL_{upper}")
+        cg.add_define(f"USE_{upper}")
+        canonical = _TO_CANONICAL.get(upper, upper)
+        if canonical not in _ALL_CANONICAL_WIDGETS:
+            # Non-widget entry (e.g. LOG, THEME_DEFAULT, USER_DATA)
+            df.add_define(f"LV_USE_{upper}")
+
+    # Determine which canonical widget defines are needed
+    _used_canonical = set()
+    for use in helpers.lv_uses:
+        canonical = _TO_CANONICAL.get(use.upper(), use.upper())
+        if canonical in _ALL_CANONICAL_WIDGETS:
+            _used_canonical.add(canonical)
+
+    # Set LV_USE_*=1 for used widgets, LV_USE_*=0 for unused (canonical names only)
+    for widget in _ALL_CANONICAL_WIDGETS:
+        df.add_define(f"LV_USE_{widget}", "1" if widget in _used_canonical else "0")
+
+    # ============================================
+    # CONDITIONAL HEAVY FEATURES (based on widget usage)
+    # ============================================
+    # Only enable ThorVG/SVG/Lottie/Vector Graphics if actually needed.
+    # This saves ~500KB-1MB of flash on ESP32 devices.
+    needs_thorvg = bool(
+        {"THORVG_INTERNAL", "SVG", "LOTTIE", "VECTOR_GRAPHIC"} & helpers.lv_uses
+    )
+
+    if needs_thorvg:
+        df.add_define("LV_USE_FLOAT", "1")
+        df.add_define("LV_USE_MATRIX", "1")
+        df.add_define("LV_USE_VECTOR_GRAPHIC", "1")
+        df.add_define("LV_USE_THORVG_INTERNAL", "1")
+        df.add_define("LV_VG_LITE_THORVG_16PIXELS_ALIGN", "1")
+        # Large stack for ThorVG rendering
+        df.add_define("LV_DRAW_THREAD_STACK_SIZE", "(48 * 1024)")
+        # pngdec only needed for ThorVG image pipeline
+        cg.add_library("pngdec", "1.0.1")
+        # Signal to lvgl_build_filter.py to compile ThorVG sources
+        cg.add_build_flag("-DLVGL_USE_THORVG=1")
+        df.LOGGER.info("ThorVG enabled (SVG/Lottie widgets detected)")
+    else:
+        df.add_define("LV_USE_FLOAT", "0")
+        df.add_define("LV_USE_MATRIX", "0")
+        df.add_define("LV_USE_VECTOR_GRAPHIC", "0")
+        df.add_define("LV_USE_THORVG_INTERNAL", "0")
+        df.add_define("LV_USE_SVG", "0")
+        df.add_define("LV_USE_LOTTIE", "0")
+        # Smaller stack when ThorVG is not used
+        df.add_define("LV_DRAW_THREAD_STACK_SIZE", "(8 * 1024)")
+        df.LOGGER.info(
+            "ThorVG disabled (no SVG/Lottie widgets) - saving ~500KB flash"
+        )
+
+    # Image decoders: BMP and GIF are small, enable if IMAGE widget is used
+    if "IMAGE" in helpers.lv_uses or "ANIMIMG" in helpers.lv_uses:
+        df.add_define("LV_USE_BMP", "1")
+        df.add_define("LV_USE_GIF", "1")
+    else:
+        df.add_define("LV_USE_BMP", "0")
+        df.add_define("LV_USE_GIF", "0")
+
+    # Signal to lvgl_build_filter.py which widgets are used, so it can
+    # skip compiling LVGL widget source files that aren't needed.
+    # Format: comma-separated list of lowercase LVGL widget names.
+    widget_names = ",".join(sorted(use.lower() for use in helpers.lv_uses))
+    cg.add_build_flag(f'-DLVGL_WIDGETS_USED=\\"{widget_names}\\"')
+
     lv_conf_h_file = CORE.relative_src_path(LV_CONF_FILENAME)
     write_file_if_changed(lv_conf_h_file, generate_lv_conf_h())
     cg.add_build_flag("-DLV_CONF_H=1")

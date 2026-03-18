@@ -373,7 +373,9 @@ LVEncoderListener::LVEncoderListener(lv_indev_type_t type, uint16_t long_press_t
     auto *l = static_cast<LVEncoderListener *>(lv_indev_get_user_data(d));
     data->state = l->pressed_ ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
     data->key = l->key_;
-    data->enc_diff = (int16_t) (l->count_ - l->last_count_);
+    // LVGL 9.5: Apply rotary sensitivity multiplier
+    auto raw_diff = (int16_t) (l->count_ - l->last_count_);
+    data->enc_diff = (int16_t) (raw_diff * l->sensitivity_);
     l->last_count_ = l->count_;
     data->continue_reading = false;
   });
@@ -565,6 +567,11 @@ void LvglComponent::setup() {
   if (frac == 0)
     frac = 1;
   auto buf_bytes = width * height / frac * LV_COLOR_DEPTH / 8;
+  // Fix for issue #9868: Align buffer size to 64 bytes for PPA/cache compatibility
+  // on ESP32-P4. esp_cache_msync() requires both address AND size to be cache-line
+  // aligned (64 bytes). Without this, PPA operations fail on PSRAM buffers.
+  constexpr size_t BUF_SIZE_ALIGN = 64;
+  buf_bytes = (buf_bytes + BUF_SIZE_ALIGN - 1) & ~(BUF_SIZE_ALIGN - 1);
   void *buffer = nullptr;
   // CRITICAL: Always use lv_malloc_core() which guarantees 64-byte alignment
   // Don't use malloc() as it may not be aligned correctly for LVGL 9.5
@@ -668,12 +675,7 @@ void LvglComponent::static_flush_cb(lv_display_t *disp_drv, const lv_area_t *are
   reinterpret_cast<LvglComponent *>(lv_display_get_user_data(disp_drv))->flush_cb_(disp_drv, area, color_p);
 }
 
-/**
- * Function to apply colors to ticks based on position
- * @param e The event data
- * @param color_start The color to apply to the first tick
- * @param color_end  The color to apply to the last tick
- */
+#if LV_USE_SCALE
 void lv_scale_draw_event_cb(lv_event_t *e, uint16_t range_start, uint16_t range_end, lv_color_t color_start,
                             lv_color_t color_end, bool local) {
   auto *scale = static_cast<lv_obj_t *>(lv_event_get_target(e));
@@ -697,14 +699,6 @@ void lv_scale_draw_event_cb(lv_event_t *e, uint16_t range_start, uint16_t range_
   }
 }
 
-/**
- * Draw event callback to offset major tick positions on a scale widget.
- * When used, all ticks are set as major (major_tick_every=1) and this callback
- * selectively applies minor tick styling to non-major ticks based on offset and stride.
- * @param e The event data
- * @param offset Tick index of the first major tick
- * @param stride Number of ticks between consecutive major ticks
- */
 void lv_scale_tick_offset_event_cb(lv_event_t *e, uint16_t offset, uint16_t stride) {
   auto *scale = static_cast<lv_obj_t *>(lv_event_get_target(e));
   lv_draw_task_t *task = lv_event_get_draw_task(e);
@@ -717,11 +711,9 @@ void lv_scale_tick_offset_event_cb(lv_event_t *e, uint16_t offset, uint16_t stri
     bool is_major = (tick_idx >= offset) && ((tick_idx - offset) % stride == 0);
 
     if (!is_major) {
-      // Apply minor tick color and width from ITEMS part styles
       line_dsc->color = lv_obj_get_style_line_color(scale, LV_PART_ITEMS);
       line_dsc->width = lv_obj_get_style_line_width(scale, LV_PART_ITEMS);
 
-      // Shorten tick line to minor length using ratio of style lengths
       int32_t minor_len = lv_obj_get_style_length(scale, LV_PART_ITEMS);
       int32_t major_len = lv_obj_get_style_length(scale, LV_PART_INDICATOR);
       if (major_len > 0 && minor_len > 0 && minor_len != major_len) {
@@ -738,11 +730,11 @@ void lv_scale_tick_offset_event_cb(lv_event_t *e, uint16_t offset, uint16_t stri
     bool is_major = (tick_idx >= offset) && ((tick_idx - offset) % stride == 0);
 
     if (!is_major) {
-      // Hide label for non-major ticks
       label_dsc->opa = LV_OPA_TRANSP;
     }
   }
 }
+#endif  // LV_USE_SCALE
 
 static void lv_container_constructor(const lv_obj_class_t *class_p, lv_obj_t *obj) {
   LV_TRACE_OBJ_CREATE("begin");

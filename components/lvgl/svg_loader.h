@@ -2,13 +2,17 @@
 
 #ifdef USE_ESP32
 
+// Only compile when SVG widget is actually used (LV_USE_SVG=1 in lv_conf.h).
+// This header is pulled in via esphome.h for all builds, so we must guard it.
+#include <lvgl.h>
+#if LV_USE_SVG
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include <cstdio>
 #include <cstring>
-#include <lvgl.h>
 
 // ThorVG C API – compiled into LVGL when LV_USE_THORVG_INTERNAL=1.
 #include <src/libs/thorvg/thorvg_capi.h>
@@ -328,4 +332,5 @@ inline bool svg_setup_and_render_file(lv_obj_t *canvas_obj,
 }  // namespace lvgl
 }  // namespace esphome
 
+#endif  // LV_USE_SVG
 #endif  // USE_ESP32

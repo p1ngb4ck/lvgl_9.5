@@ -117,6 +117,9 @@ ENCODER_SCHEMA = cv.Schema(
         ),
         cv.Optional(df.CONF_LONG_PRESS_TIME, default="400ms"): PRESS_TIME,
         cv.Optional(df.CONF_LONG_PRESS_REPEAT_TIME, default="100ms"): PRESS_TIME,
+        cv.Optional(df.CONF_ROTARY_SENSITIVITY, default=1.0): cv.float_range(
+            min=0.1, max=10.0
+        ),
     }
 )
 
@@ -235,6 +238,40 @@ STYLE_PROPS = {
     "width": lvalid.size,
     "x": lvalid.pixels_or_percent,
     "y": lvalid.pixels_or_percent,
+    # LVGL 9.5: Blur / Frosted Glass properties
+    "blur_radius": lvalid.lv_positive_int,
+    "blur_backdrop": lvalid.lv_bool,
+    "blur_quality": df.LvConstant(
+        "LV_BLUR_QUALITY_", "SPEED", "PRECISION", "AUTO"
+    ).one_of,
+    # LVGL 9.5: Gradient per-stop opacity
+    "bg_main_opa": lvalid.opacity,
+    "bg_grad_opa": lvalid.opacity,
+    # LVGL 9.5: Image opacity
+    "image_opa": lvalid.opacity,
+    # LVGL 9.5: Bitmap mask source
+    "bitmap_mask_src": lvalid.lv_image,
+    # LVGL 9.5: External margins (flex/grid)
+    "margin_top": lvalid.padding,
+    "margin_bottom": lvalid.padding,
+    "margin_left": lvalid.padding,
+    "margin_right": lvalid.padding,
+    # LVGL 9.5: Text outline stroke
+    "text_outline_stroke_color": lvalid.lv_color,
+    "text_outline_stroke_opa": lvalid.opacity,
+    "text_outline_stroke_width": lvalid.lv_positive_int,
+    # LVGL 9.5: Drop shadow (independent from regular shadow)
+    "drop_shadow_radius": lvalid.lv_positive_int,
+    "drop_shadow_offset_x": lvalid.lv_int,
+    "drop_shadow_offset_y": lvalid.lv_int,
+    "drop_shadow_color": lvalid.lv_color,
+    "drop_shadow_opa": lvalid.opacity,
+    "drop_shadow_quality": df.LvConstant(
+        "LV_BLUR_QUALITY_", "SPEED", "PRECISION", "AUTO"
+    ).one_of,
+    # LVGL 9.5: Additional image properties
+    "image_colorkey": lvalid.lv_color,
+    "arc_image_src": lvalid.lv_image,
 }
 
 STYLE_REMAP = {

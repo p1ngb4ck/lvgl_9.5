@@ -51,9 +51,11 @@ extern lv_event_code_t lv_update_event;  // NOLINT
 extern std::string lv_event_code_name_for(lv_event_t *event);
 
 lv_obj_t *lv_container_create(lv_obj_t *parent);
+#if LV_USE_SCALE
 void lv_scale_draw_event_cb(lv_event_t *e, uint16_t range_start, uint16_t range_end, lv_color_t color_start,
                             lv_color_t color_end, bool local);
 void lv_scale_tick_offset_event_cb(lv_event_t *e, uint16_t offset, uint16_t stride);
+#endif  // LV_USE_SCALE
 #if LV_COLOR_DEPTH == 16
 static const display::ColorBitness LV_BITNESS = display::ColorBitness::COLOR_BITNESS_565;
 #elif LV_COLOR_DEPTH == 32
@@ -354,6 +356,9 @@ class LVEncoderListener : public Parented<LvglComponent> {
     }
   }
 
+  // LVGL 9.5: Set rotary encoder sensitivity multiplier
+  void set_sensitivity(float sensitivity) { this->sensitivity_ = sensitivity; }
+
   lv_indev_t *get_drv() { return this->drv_; }
 
  protected:
@@ -362,6 +367,7 @@ class LVEncoderListener : public Parented<LvglComponent> {
   int32_t count_{};
   int32_t last_count_{};
   int key_{};
+  float sensitivity_{1.0f};
 };
 #endif  //  USE_LVGL_KEY_LISTENER
 
