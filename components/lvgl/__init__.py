@@ -407,6 +407,7 @@ async def to_code(configs):
         "IMAGE": "IMG",
         "IMAGEBUTTON": "IMGBTN",
         "ANIMIMAGE": "ANIMIMG",
+        "SPANGROUP": "SPAN",
         "METER": "SCALE",
     }
     # All canonical LV_USE_* widget define names in LVGL v9.x
@@ -475,8 +476,9 @@ async def to_code(configs):
             "ThorVG disabled (no SVG/Lottie widgets) - saving ~500KB flash"
         )
 
-    # Image decoders: BMP and GIF are small, enable if IMAGE widget is used
-    if "IMAGE" in helpers.lv_uses or "ANIMIMG" in helpers.lv_uses:
+    # Image decoders: BMP and GIF are small, enable if image widget is used
+    # lv_uses stores names as-is from add_lv_use(): lowercase from widgets, uppercase from helpers.py
+    if "image" in helpers.lv_uses or "img" in helpers.lv_uses or "animimg" in helpers.lv_uses:
         df.add_define("LV_USE_BMP", "1")
         df.add_define("LV_USE_GIF", "1")
     else:

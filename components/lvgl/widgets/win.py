@@ -73,7 +73,7 @@ class WindowType(WidgetType):
                     lv.win_add_button(w.obj, literal("NULL"), literal("40"))
 
     def get_uses(self):
-        return ("btn", "label")
+        return ("btn", "label", "img")
 
 
 win_spec = WindowType()
