@@ -364,6 +364,12 @@ class MeterType(WidgetType):
 
             angle_range = await lv_angle_degrees.process(scale_conf[CONF_ANGLE_RANGE])
             rotation = await lv_angle_degrees.process(scale_conf[CONF_ROTATION])
+            # LVGL 8.x meter: rotation 0 = start at bottom (6 o'clock)
+            # LVGL 9.x scale: rotation 0 = start at right (3 o'clock)
+            # Compensate: add 90 + (360 - angle_range) / 2 to match 8.x behavior
+            # For 8.x compat: the arc is centered, starting from bottom-left
+            adjusted_rotation = rotation + 90 + (360 - angle_range) // 2
+            adjusted_rotation = adjusted_rotation % 360
             # Set angle range
             lv.scale_set_angle_range(
                 scale_var,
@@ -371,7 +377,7 @@ class MeterType(WidgetType):
             )
 
             # Always set rotation (0 is valid but falsy in Python)
-            lv.scale_set_rotation(scale_var, rotation)
+            lv.scale_set_rotation(scale_var, adjusted_rotation)
 
             # Handle indicators BEFORE ticks (order matters for LVGL 9.5)
             for indicator in scale_conf.get(CONF_INDICATORS, ()):
