@@ -41,7 +41,8 @@ namespace esphome::lvgl {
 
 #if LV_COLOR_DEPTH == 16
 using lv_color_data = uint16_t;
-#elif LV_COLOR_DEPTH == 32
+#endif
+#if LV_COLOR_DEPTH == 32
 using lv_color_data = uint32_t;
 #endif
 

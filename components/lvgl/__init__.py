@@ -268,14 +268,7 @@ async def to_code(configs):
         "LVGL_LOG_LEVEL",
         cg.RawExpression(f"ESPHOME_LOG_LEVEL_{config_0[CONF_LOG_LEVEL]}"),
     )
-    # LVGL 9.5 does not support LV_COLOR_DEPTH=24 internally (3-byte lv_color_t
-    # causes alignment faults on RISC-V).  Use LV_COLOR_DEPTH=32 with RGB888
-    # display format instead — the buffer is slightly larger but properly aligned.
-    user_color_depth = config_0[CONF_COLOR_DEPTH]
-    lv_color_depth = 32 if user_color_depth == 24 else user_color_depth
-    df.add_define("LV_COLOR_DEPTH", lv_color_depth)
-    if user_color_depth == 24:
-        df.add_define("LVGL_USER_COLOR_DEPTH_24", "1")
+    df.add_define("LV_COLOR_DEPTH", config_0[CONF_COLOR_DEPTH])
     for font in helpers.lv_fonts_used:
         df.add_define(f"LV_FONT_{font.upper()}")
 
@@ -552,7 +545,7 @@ LVGL_SCHEMA = cv.All(
             {
                 cv.GenerateID(CONF_ID): cv.declare_id(LvglComponent),
                 cv.GenerateID(df.CONF_DISPLAYS): display_schema,
-                cv.Optional(CONF_COLOR_DEPTH, default=16): cv.one_of(16, 24),
+                cv.Optional(CONF_COLOR_DEPTH, default=16): cv.one_of(16),
                 cv.Optional(
                     df.CONF_DEFAULT_FONT, default="montserrat_14"
                 ): lvalid.lv_font,
