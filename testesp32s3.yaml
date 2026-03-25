@@ -250,16 +250,6 @@ display:
     invert_colors: false 
 
 
-
-
-image:
-
-  defaults:
-    byte_order: little_endian
-    transparency: alpha_channel
-    type: rgb565
-  images:
-
      
 
 lvgl:
