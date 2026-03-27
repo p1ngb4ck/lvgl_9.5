@@ -11,9 +11,13 @@ static const char *const TAG = "font";
 
 #ifdef USE_LVGL_FONT
 
-static const uint8_t OPA4_TABLE[16] = {0, 17, 34, 51, 68, 85, 102, 119, 136, 153, 170, 187, 204, 221, 238, 255};
+static const uint8_t OPA4_TABLE[16] = {
+    0, 17, 34, 51, 68, 85, 102, 119,
+    136, 153, 170, 187, 204, 221, 238, 255};
+
 static const uint8_t OPA2_TABLE[4] = {0, 85, 170, 255};
 
+// ================= SIMPLE BITMAP =================
 const uint8_t *Font::get_glyph_bitmap(const lv_font_t *font, uint32_t unicode_letter) {
   auto *fe = (Font *) font->dsc;
   const auto *gd = fe->get_glyph_data_(unicode_letter);
@@ -24,6 +28,7 @@ const uint8_t *Font::get_glyph_bitmap(const lv_font_t *font, uint32_t unicode_le
   return gd->data;
 }
 
+// ================= LVGL DRAW =================
 const void *Font::get_glyph_bitmap(lv_font_glyph_dsc_t *dsc, lv_draw_buf_t *draw_buf) {
   const auto *font = dsc->resolved_font;
   auto *fe = (Font *) font->dsc;
@@ -98,6 +103,7 @@ const void *Font::get_glyph_bitmap(lv_font_glyph_dsc_t *dsc, lv_draw_buf_t *draw
   return draw_buf;
 }
 
+// ================= GLYPH DESC =================
 bool Font::get_glyph_dsc_cb(const lv_font_t *font, lv_font_glyph_dsc_t *dsc,
                             uint32_t unicode_letter, uint32_t next) {
   auto *fe = (Font *) font->dsc;
@@ -110,13 +116,16 @@ bool Font::get_glyph_dsc_cb(const lv_font_t *font, lv_font_glyph_dsc_t *dsc,
   dsc->box_h = gd->height;
   dsc->ofs_x = gd->offset_x;
   dsc->ofs_y = gd->offset_y;
-  dsc->bpp = fe->get_bpp();
-  dsc->format = (lv_font_glyph_format_t) fe->get_bpp();
+
+  // ⚠️ LVGL 8+ → PAS DE bpp
+  dsc->format = LV_FONT_GLYPH_FORMAT_A8;
+
   dsc->gid.index = unicode_letter;
 
   return true;
 }
 
+// ================= CACHE =================
 const Glyph *Font::get_glyph_data_(uint32_t unicode_letter) {
   if (unicode_letter == this->last_letter_ && this->last_letter_ != 0)
     return this->last_data_;
@@ -130,10 +139,9 @@ const Glyph *Font::get_glyph_data_(uint32_t unicode_letter) {
   return glyph;
 }
 
-#endif
+#endif  // USE_LVGL_FONT
 
 // ================= UTF-8 =================
-
 static uint32_t extract_unicode_codepoint(const char *utf8_str, size_t *length) {
   const uint8_t *current = reinterpret_cast<const uint8_t *>(utf8_str);
   uint32_t code_point = 0;
@@ -154,14 +162,21 @@ static uint32_t extract_unicode_codepoint(const char *utf8_str, size_t *length) 
     uint8_t c2 = *current++;
     uint8_t c3 = *current++;
     if (((c2 & 0xC0) != 0x80) || ((c3 & 0xC0) != 0x80)) return 0;
-    code_point = ((c1 & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F);
+    code_point = ((c1 & 0x0F) << 12) |
+                 ((c2 & 0x3F) << 6) |
+                 (c3 & 0x3F);
   } else if ((c1 & 0xF8) == 0xF0) {
     uint8_t c2 = *current++;
     uint8_t c3 = *current++;
     uint8_t c4 = *current++;
-    if (((c2 & 0xC0) != 0x80) || ((c3 & 0xC0) != 0x80) || ((c4 & 0xC0) != 0x80)) return 0;
-    code_point = ((c1 & 7) << 18) | ((c2 & 0x3F) << 12) |
-                 ((c3 & 0x3F) << 6) | (c4 & 0x3F);
+    if (((c2 & 0xC0) != 0x80) ||
+        ((c3 & 0xC0) != 0x80) ||
+        ((c4 & 0xC0) != 0x80)) return 0;
+
+    code_point = ((c1 & 7) << 18) |
+                 ((c2 & 0x3F) << 12) |
+                 ((c3 & 0x3F) << 6) |
+                 (c4 & 0x3F);
   } else {
     *length = 0;
     return 0;
@@ -172,7 +187,6 @@ static uint32_t extract_unicode_codepoint(const char *utf8_str, size_t *length) 
 }
 
 // ================= CONSTRUCTEUR =================
-
 Font::Font(const Glyph *data, int data_nr, int baseline, int height,
            int descender, int xheight, int capheight, uint8_t bpp)
     : glyphs_(ConstVector(data, data_nr)),
@@ -187,14 +201,14 @@ Font::Font(const Glyph *data, int data_nr, int baseline, int height,
 #ifdef USE_LVGL_FONT
   this->lv_font_.dsc = this;
   this->lv_font_.line_height = this->get_height();
-  this->lv_font_.base_line = this->lv_font_.line_height - this->get_baseline();
+  this->lv_font_.base_line =
+      this->lv_font_.line_height - this->get_baseline();
   this->lv_font_.get_glyph_dsc = get_glyph_dsc_cb;
   this->lv_font_.get_glyph_bitmap = get_glyph_bitmap;
 #endif
 }
 
-// ================= GLYPH =================
-
+// ================= SEARCH =================
 const Glyph *Font::find_glyph(uint32_t codepoint) const {
   int lo = 0;
   int hi = this->glyphs_.size() - 1;
