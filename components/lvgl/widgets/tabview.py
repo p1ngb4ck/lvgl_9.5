@@ -90,6 +90,7 @@ class TabviewType(WidgetType):
             lv_assign(tab_obj, lv_expr.tabview_add_tab(w.obj, tab_conf[CONF_NAME]))
             await set_obj_properties(tab_widget, tab_conf)
             await add_widgets(tab_widget, tab_conf)
+            lv_obj.update_layout(tab_obj)
         tab_style = config.get(CONF_TAB_STYLE, {})
         tab_items_style = tab_style.get(CONF_ITEMS, {})
         if tab_style:
