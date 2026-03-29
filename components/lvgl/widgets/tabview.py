@@ -105,11 +105,16 @@ class TabviewType(WidgetType):
                             tab_items_style,
                         )
 
-        if content_style := config.get(CONF_CONTENT_STYLE):
-            with LocalVariable(
-                "tabview_content", lv_obj_t, rhs=lv_expr.tabview_get_content(w.obj)
-            ) as content_obj:
-                await set_obj_properties(Widget(content_obj, obj_spec), content_style)
+        with LocalVariable(
+            "tabview_content", lv_obj_t, rhs=lv_expr.tabview_get_content(w.obj)
+        ) as content_obj:
+            if content_style := config.get(CONF_CONTENT_STYLE):
+                await set_obj_properties(
+                    Widget(content_obj, obj_spec), content_style
+                )
+            lv_obj.remove_flag(
+                content_obj, literal("LV_OBJ_FLAG_SCROLLABLE")
+            )
         lv_obj.update_layout(w.obj)
         lv_obj.invalidate(w.obj)
 
