@@ -12,7 +12,7 @@ substitutions:
   font_family: Figtree  
 
   frigate: 
-  #frigate1: rtsp://Tapoone:Tapoone132@192.168.1.56:554/stream1
+  #frigate1: 
  
   media_player_entity: "media_player.waveshare_esp32_p4_media_player"
   weather_entity: weather.forecast_maison #weather
