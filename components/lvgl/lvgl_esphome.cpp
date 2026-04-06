@@ -68,31 +68,20 @@ static bool ppa_rotate_display_buf(const void *src, void *dst, int32_t w, int32_
 #endif
 
   ppa_srm_oper_config_t cfg = {};
-  // Input block: full area from LVGL draw buffer
   cfg.in.buffer = (void *) src;
   cfg.in.pic_w = w;
   cfg.in.pic_h = h;
   cfg.in.block_w = w;
   cfg.in.block_h = h;
-  cfg.in.block_offset_x = 0;
-  cfg.in.block_offset_y = 0;
   cfg.in.srm_cm = PPA_CM;
-  // Output: rotation buffer, tightly packed
   cfg.out.buffer = dst;
   cfg.out.buffer_size = (size_t) out_w * out_h * BPP;
   cfg.out.pic_w = out_w;
   cfg.out.pic_h = out_h;
-  cfg.out.block_offset_x = 0;
-  cfg.out.block_offset_y = 0;
   cfg.out.srm_cm = PPA_CM;
-  // Rotation only, no scale/mirror
   cfg.rotation_angle = ppa_angle;
-  cfg.scale_x = 1.0f;
+  cfg.scale_x = 1.0f;  // must be 1.0f, not 0.0f (default after zero-init)
   cfg.scale_y = 1.0f;
-  cfg.mirror_x = false;
-  cfg.mirror_y = false;
-  cfg.rgb_swap = false;
-  cfg.byte_swap = false;
   cfg.alpha_update_mode = PPA_ALPHA_NO_CHANGE;
   cfg.mode = PPA_TRANS_MODE_BLOCKING;
 
@@ -316,10 +305,10 @@ void LvglComponent::draw_buffer_(const lv_area_t *area, lv_color_data *ptr) {
 #ifdef USE_LVGL_PPA
   // Try PPA hardware rotation first (zero CPU cost, ~10x faster than SW loops).
   // Falls back to software automatically if PPA rejects the operation.
-  if (this->use_ppa_rotation_ && this->rotation != display::DISPLAY_ROTATION_0_DEGREES) {
+  if (s_display_srm_client != nullptr && this->rotation != display::DISPLAY_ROTATION_0_DEGREES) {
     if (ppa_rotate_display_buf(ptr, this->rotate_buf_, width, height, this->rotation)) {
-      dst = reinterpret_cast<lv_color_data *>(this->rotate_buf_);
-      // Coordinate update is identical to the software path (same output geometry)
+      // dst already points to rotate_buf_ (initialized above)
+      // Coordinate update: identical geometry to the software path
       switch (this->rotation) {
         case display::DISPLAY_ROTATION_90_DEGREES:
           y1 = x1;
@@ -817,10 +806,7 @@ void LvglComponent::setup() {
       return;
     }
 #ifdef USE_LVGL_PPA
-    // Enable PPA-accelerated rotation if the SRM client was registered successfully.
-    // ppa_rotate_display_buf() falls back to SW automatically on unsupported cases.
-    this->use_ppa_rotation_ = (s_display_srm_client != nullptr);
-    if (this->use_ppa_rotation_) {
+    if (s_display_srm_client != nullptr) {
       ESP_LOGI(TAG, "Display rotation will use PPA SRM hardware acceleration");
     }
 #endif
