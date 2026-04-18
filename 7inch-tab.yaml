@@ -2182,12 +2182,12 @@ lvgl:
       scrollbar_mode: "off"
 
       widgets:
-        # Chart header strip: x=0, y=40, w=1024, h=28
+        # Chart header strip: x=0, y=80, w=1024, h=32
         - obj:
             x: 0
-            y: 40
+            y: 80
             width: 1024
-            height: 28
+            height: 32
             bg_color: 0x0D0D0D
             border_width: 0
             radius: 0
@@ -2222,16 +2222,16 @@ lvgl:
                   text_color: 0x444444
                   text_font: montserrat_12
 
-        # Voltage chart row: x=0, y=68, w=1024, h=164
+        # Voltage chart row: x=0, y=112, w=1024, h=136
         - obj:
             x: 0
-            y: 68
+            y: 112
             width: 1024
-            height: 164
-            bg_color: 0x070D07
-            border_color: 0x002208
+            height: 136
+            bg_color: 0x0C1A0C
+            border_color: 0x004408
             border_width: 1
-            radius: 6
+            radius: 8
             pad_all: 8
             scrollbar_mode: "off"
             layout:
@@ -2243,7 +2243,7 @@ lvgl:
             widgets:
               - obj:
                   width: 44
-                  height: 148
+                  height: 120
                   bg_opa: TRANSP
                   border_width: 0
                   scrollbar_mode: "off"
@@ -2264,13 +2264,13 @@ lvgl:
 
               - chart:
                   id: chart_v
-                  width: 944
-                  height: 148
+                  width: 948
+                  height: 120
                   type: LINE
                   point_count: 60
                   update_mode: SHIFT
-                  bg_color: 0x050D05
-                  border_color: 0x002208
+                  bg_color: 0x070F07
+                  border_color: 0x003306
                   border_width: 1
                   div_line_count_hor: 4
                   div_line_count_ver: 6
@@ -2278,8 +2278,8 @@ lvgl:
                     line_color: 0x4499FF
                     line_width: 2
                     bg_color: 0x4499FF
-                    bg_opa: 20%
-                    bg_grad_color: 0x050D05
+                    bg_opa: 30%
+                    bg_grad_color: 0x070F07
                     bg_grad_dir: VER
                   indicator:
                     radius: 0
@@ -2290,16 +2290,16 @@ lvgl:
                     - id: ser_v
                       color: 0x4499FF
 
-        # Current chart row: x=0, y=232, w=1024, h=164
+        # Current chart row: x=0, y=248, w=1024, h=136
         - obj:
             x: 0
-            y: 232
+            y: 248
             width: 1024
-            height: 164
-            bg_color: 0x070D07
-            border_color: 0x002208
+            height: 136
+            bg_color: 0x0C1A0C
+            border_color: 0x004408
             border_width: 1
-            radius: 6
+            radius: 8
             pad_all: 8
             scrollbar_mode: "off"
             layout:
@@ -2311,7 +2311,7 @@ lvgl:
             widgets:
               - obj:
                   width: 44
-                  height: 148
+                  height: 120
                   bg_opa: TRANSP
                   border_width: 0
                   scrollbar_mode: "off"
@@ -2332,13 +2332,13 @@ lvgl:
 
               - chart:
                   id: chart_i
-                  width: 944
-                  height: 148
+                  width: 948
+                  height: 120
                   type: LINE
                   point_count: 60
                   update_mode: SHIFT
-                  bg_color: 0x050D05
-                  border_color: 0x002208
+                  bg_color: 0x070F07
+                  border_color: 0x003306
                   border_width: 1
                   div_line_count_hor: 4
                   div_line_count_ver: 6
@@ -2346,8 +2346,8 @@ lvgl:
                     line_color: 0xFFAA22
                     line_width: 2
                     bg_color: 0xFFAA22
-                    bg_opa: 15%
-                    bg_grad_color: 0x050D05
+                    bg_opa: 30%
+                    bg_grad_color: 0x070F07
                     bg_grad_dir: VER
                   indicator:
                     radius: 0
@@ -2358,16 +2358,16 @@ lvgl:
                     - id: ser_i
                       color: 0xFFAA22
 
-        # Power chart row: x=0, y=396, w=1024, h=164
+        # Power chart row: x=0, y=384, w=1024, h=136
         - obj:
             x: 0
-            y: 396
+            y: 384
             width: 1024
-            height: 164
-            bg_color: 0x070D07
-            border_color: 0x002208
+            height: 136
+            bg_color: 0x0C1A0C
+            border_color: 0x004408
             border_width: 1
-            radius: 6
+            radius: 8
             pad_all: 8
             scrollbar_mode: "off"
             layout:
@@ -2379,7 +2379,7 @@ lvgl:
             widgets:
               - obj:
                   width: 44
-                  height: 148
+                  height: 120
                   bg_opa: TRANSP
                   border_width: 0
                   scrollbar_mode: "off"
@@ -2400,13 +2400,13 @@ lvgl:
 
               - chart:
                   id: chart_p
-                  width: 944
-                  height: 148
+                  width: 948
+                  height: 120
                   type: LINE
                   point_count: 60
                   update_mode: SHIFT
-                  bg_color: 0x050D05
-                  border_color: 0x002208
+                  bg_color: 0x070F07
+                  border_color: 0x003306
                   border_width: 1
                   div_line_count_hor: 4
                   div_line_count_ver: 6
@@ -2414,8 +2414,8 @@ lvgl:
                     line_color: 0xFF44CC
                     line_width: 2
                     bg_color: 0xFF44CC
-                    bg_opa: 15%
-                    bg_grad_color: 0x050D05
+                    bg_opa: 30%
+                    bg_grad_color: 0x070F07
                     bg_grad_dir: VER
                   indicator:
                     radius: 0
