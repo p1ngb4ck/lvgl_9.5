@@ -1,6 +1,13 @@
 esphome:
   name: esp32-p4-tab7
   friendly_name: 7inch-tab
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          lv_obj_add_state(id(fw_filter_sw), LV_STATE_CHECKED);
+          lv_obj_add_state(id(fw_flash_btn), LV_STATE_DISABLED);
+          lv_obj_add_state(id(fw_progress_close), LV_STATE_DISABLED);
 
 esp32:
   variant: ESP32P4
@@ -2676,8 +2683,6 @@ lvgl:
                         text_font: montserrat_14
                     - switch:
                         id: fw_filter_sw
-                        state:
-                          checked: true
                         on_value:
                           - globals.set:
                               id: g_fw_filter_bin
@@ -2821,8 +2826,6 @@ lvgl:
                   border_color: 0x39FF14
                   border_width: 2
                   radius: 6
-                  state:
-                    disabled: true
                   on_click:
                     - lvgl.widget.show: fw_confirm_overlay
                   widgets:
@@ -3132,8 +3135,6 @@ lvgl:
                         align: CENTER
                         bg_color: 0x333333
                         radius: 6
-                        state:
-                          disabled: true
                         on_click:
                           - lvgl.widget.hide: fw_progress_overlay
                           - globals.set:
