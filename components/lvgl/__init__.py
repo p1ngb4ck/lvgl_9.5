@@ -243,8 +243,13 @@ async def to_code(configs):
     cg.add_platformio_option("extra_scripts", [f"pre:{build_filter_script}"])
 
     # Define ESPHOME_ENTITY_BUTTON_COUNT for ESPHome core compatibility
-    # This is required by application.h even when not using button entities
-    cg.add_define("ESPHOME_ENTITY_BUTTON_COUNT", 0)
+    # application.h requires this symbol even when no button entities exist.
+    # When the user configures button entities, ESPHome core already emits the
+    # correct count in defines.h, so we must avoid redefining it (which would
+    # trigger a -Wmacro-redefined warning). Only add the 0 fallback when no
+    # button platform is configured.
+    if not CORE.config.get("button"):
+        cg.add_define("ESPHOME_ENTITY_BUTTON_COUNT", 0)
 
     # suppress default enabling of extra widgets
     df.add_define("_LV_KCONFIG_PRESENT")
