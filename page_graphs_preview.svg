@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="600" viewBox="0 0 1024 600" font-family="sans-serif">
+  <!-- Page background -->
+  <rect width="1024" height="600" fill="#111111"/>
+
+  <!-- ============ TOP_LAYER HEADER (y=0..80) ============ -->
+  <rect x="0" y="0" width="1024" height="80" fill="#141414"/>
+  <text x="20"  y="46" fill="#AAAAAA" font-size="20">--:--</text>
+  <text x="420" y="46" fill="#333333" font-size="20">SD  USB  NFS  HA  DPS</text>
+  <text x="900" y="46" fill="#888888" font-size="18">IN  --.-V</text>
+
+  <!-- ============ LEGEND HEADER STRIP (y=80..120) ============ -->
+  <rect x="0" y="80" width="1024" height="40" fill="#0D0D0D"/>
+  <circle cx="40"  cy="100" r="5" fill="#4499FF"/>
+  <text   x="55"  y="106" fill="#4499FF" font-size="16">Vout  3.28V</text>
+  <circle cx="340" cy="100" r="5" fill="#FFAA22"/>
+  <text   x="355" y="106" fill="#FFAA22" font-size="16">Iout  0.500A</text>
+  <circle cx="640" cy="100" r="5" fill="#FF44CC"/>
+  <text   x="655" y="106" fill="#FF44CC" font-size="16">Pout  1.64W</text>
+  <text   x="880" y="106" fill="#555555" font-size="12">60s  /  % du setpoint</text>
+
+  <!-- ============ COMBINED CHART ROW (y=120..520) ============ -->
+  <rect x="0" y="120" width="1024" height="400" rx="8" ry="8" fill="#0C1A0C" stroke="#004408" stroke-width="1"/>
+  <!-- Chart plot area (y=132..508, 376px tall → 100% = y=132, 0% = y=508) -->
+  <rect x="12" y="132" width="1000" height="376" fill="#070F07" stroke="#003306" stroke-width="1"/>
+  <!-- Grid: 5 horizontal @ 20/40/60/80/100%, 6 vertical -->
+  <g stroke="#1A2A1A" stroke-width="1">
+    <line x1="12" y1="194.7" x2="1012" y2="194.7"/>
+    <line x1="12" y1="257.3" x2="1012" y2="257.3"/>
+    <line x1="12" y1="320.0" x2="1012" y2="320.0"/>
+    <line x1="12" y1="382.7" x2="1012" y2="382.7"/>
+    <line x1="12" y1="445.3" x2="1012" y2="445.3"/>
+    <line x1="155" y1="132" x2="155" y2="508"/>
+    <line x1="298" y1="132" x2="298" y2="508"/>
+    <line x1="441" y1="132" x2="441" y2="508"/>
+    <line x1="584" y1="132" x2="584" y2="508"/>
+    <line x1="727" y1="132" x2="727" y2="508"/>
+    <line x1="870" y1="132" x2="870" y2="508"/>
+  </g>
+  <!-- Scale labels on the left side of plot area -->
+  <g fill="#335533" font-size="10" text-anchor="start">
+    <text x="16" y="145">100%</text>
+    <text x="16" y="208">80%</text>
+    <text x="16" y="271">60%</text>
+    <text x="16" y="334">40%</text>
+    <text x="16" y="397">20%</text>
+    <text x="16" y="502">0%</text>
+  </g>
+
+  <!-- Setpoint 3.3V / 1A ; Output is near setpoint → V-trace high (~99%) -->
+  <!-- Voltage trace (Vout/Vset ≈ 99%) y = 508 - 0.99*376 ≈ 135 -->
+  <path d="M 12,140 L 71,138 L 131,136 L 190,137 L 250,135 L 309,134 L 369,136 L 428,133 L 488,132 L 547,134 L 607,132 L 666,133 L 726,132 L 785,133 L 845,132 L 904,133 L 964,132 L 1012,132"
+        fill="none" stroke="#4499FF" stroke-width="2"/>
+  <g fill="#4499FF">
+    <circle cx="12"   cy="140" r="3"/><circle cx="71"   cy="138" r="3"/><circle cx="131" cy="136" r="3"/>
+    <circle cx="190"  cy="137" r="3"/><circle cx="250"  cy="135" r="3"/><circle cx="309" cy="134" r="3"/>
+    <circle cx="369"  cy="136" r="3"/><circle cx="428"  cy="133" r="3"/><circle cx="488" cy="132" r="3"/>
+    <circle cx="547"  cy="134" r="3"/><circle cx="607"  cy="132" r="3"/><circle cx="666" cy="133" r="3"/>
+    <circle cx="726"  cy="132" r="3"/><circle cx="785"  cy="133" r="3"/><circle cx="845" cy="132" r="3"/>
+    <circle cx="904"  cy="133" r="3"/><circle cx="964"  cy="132" r="3"/><circle cx="1012" cy="132" r="3"/>
+  </g>
+
+  <!-- Current trace (Iout/Iset ≈ 50%) y = 508 - 0.50*376 = 320 -->
+  <path d="M 12,318 L 71,322 L 131,316 L 190,325 L 250,320 L 309,328 L 369,321 L 428,330 L 488,323 L 547,332 L 607,324 L 666,334 L 726,325 L 785,335 L 845,326 L 904,337 L 964,327 L 1012,330"
+        fill="none" stroke="#FFAA22" stroke-width="2"/>
+  <g fill="#FFAA22">
+    <circle cx="12"   cy="318" r="3"/><circle cx="71"   cy="322" r="3"/><circle cx="131" cy="316" r="3"/>
+    <circle cx="190"  cy="325" r="3"/><circle cx="250"  cy="320" r="3"/><circle cx="309" cy="328" r="3"/>
+    <circle cx="369"  cy="321" r="3"/><circle cx="428"  cy="330" r="3"/><circle cx="488" cy="323" r="3"/>
+    <circle cx="547"  cy="332" r="3"/><circle cx="607"  cy="324" r="3"/><circle cx="666" cy="334" r="3"/>
+    <circle cx="726"  cy="325" r="3"/><circle cx="785"  cy="335" r="3"/><circle cx="845" cy="326" r="3"/>
+    <circle cx="904"  cy="337" r="3"/><circle cx="964"  cy="327" r="3"/><circle cx="1012" cy="330" r="3"/>
+  </g>
+
+  <!-- Power trace (Pout/Pmax ≈ 50% because V≈99% × I≈50%) y ≈ 322 (slightly below I) -->
+  <path d="M 12,324 L 71,328 L 131,321 L 190,330 L 250,326 L 309,333 L 369,326 L 428,336 L 488,328 L 547,338 L 607,329 L 666,339 L 726,330 L 785,341 L 845,331 L 904,343 L 964,332 L 1012,335"
+        fill="none" stroke="#FF44CC" stroke-width="2"/>
+  <g fill="#FF44CC">
+    <circle cx="12"   cy="324" r="3"/><circle cx="71"   cy="328" r="3"/><circle cx="131" cy="321" r="3"/>
+    <circle cx="190"  cy="330" r="3"/><circle cx="250"  cy="326" r="3"/><circle cx="309" cy="333" r="3"/>
+    <circle cx="369"  cy="326" r="3"/><circle cx="428"  cy="336" r="3"/><circle cx="488" cy="328" r="3"/>
+    <circle cx="547"  cy="338" r="3"/><circle cx="607"  cy="329" r="3"/><circle cx="666" cy="339" r="3"/>
+    <circle cx="726"  cy="330" r="3"/><circle cx="785"  cy="341" r="3"/><circle cx="845" cy="331" r="3"/>
+    <circle cx="904"  cy="343" r="3"/><circle cx="964"  cy="332" r="3"/><circle cx="1012" cy="335" r="3"/>
+  </g>
+
+  <!-- Caption inside the chart for clarity -->
+  <text x="512" y="498" fill="#335533" font-size="11" text-anchor="middle">setpoint: 3.3 V / 1.0 A  →  V≈99%, I≈50%, P≈50%</text>
+
+  <!-- ============ TOP_LAYER FOOTER / TABS (y=520..600) ============ -->
+  <rect x="0"   y="520" width="341" height="72" fill="#111111"/>
+  <rect x="341" y="520" width="341" height="72" fill="#1A1A1A"/>
+  <rect x="341" y="590" width="341" height="2"  fill="#39FF14"/>
+  <rect x="682" y="520" width="342" height="72" fill="#111111"/>
+  <text x="170" y="562" fill="#555555" font-size="16" text-anchor="middle">MAIN</text>
+  <text x="512" y="562" fill="#39FF14" font-size="16" text-anchor="middle">GRAPHS</text>
+  <text x="853" y="562" fill="#555555" font-size="16" text-anchor="middle">SETTINGS</text>
+</svg>
