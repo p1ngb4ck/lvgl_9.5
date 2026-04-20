@@ -45,26 +45,6 @@ void lv_draw_ppa_fill(lv_draw_task_t * t, const lv_draw_fill_dsc_t * dsc,
     fill_cfg.out.pic_h           = draw_buf->header.h;
     fill_cfg.mode                = PPA_TRANS_MODE_BLOCKING;
 
-    static bool s_fill_logged_once = false;
-    if(!s_fill_logged_once) {
-        s_fill_logged_once = true;
-        LV_LOG_USER("PPA fill FIRST CALL: data_size=%u aligned=%u w=%u h=%u cf=%u",
-                    (unsigned)draw_buf->data_size,
-                    (unsigned)fill_cfg.out.buffer_size,
-                    (unsigned)draw_buf->header.w,
-                    (unsigned)draw_buf->header.h,
-                    (unsigned)draw_buf->header.cf);
-    }
-    if(draw_buf->data_size != fill_cfg.out.buffer_size) {
-        LV_LOG_USER("PPA fill: data_size=%u -> aligned=%u (delta=%u) w=%u h=%u cf=%u",
-                    (unsigned)draw_buf->data_size,
-                    (unsigned)fill_cfg.out.buffer_size,
-                    (unsigned)(fill_cfg.out.buffer_size - draw_buf->data_size),
-                    (unsigned)draw_buf->header.w,
-                    (unsigned)draw_buf->header.h,
-                    (unsigned)draw_buf->header.cf);
-    }
-
     esp_err_t ret = ppa_do_fill(u->fill_client, &fill_cfg);
     if(ret != ESP_OK) {
         LV_LOG_ERROR("PPA fill failed: %d", ret);
