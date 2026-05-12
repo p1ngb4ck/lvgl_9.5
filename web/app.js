@@ -795,11 +795,17 @@ $("#btn-compile").onclick = async () => {
     }
     if (state.extras.length) appendLog(`▶ extras   : ${state.extras.map(x => x.name).join(", ")}`);
 
+    let finalYaml = editor.value;
+    if (state.repo && !finalYaml.includes("external_components:")) {
+      finalYaml += `\nexternal_components:\n  - source: github://${state.repo.full_name}@${state.branch}\n`;
+      appendLog(`▶ injected : external_components (github://${state.repo.full_name})`);
+    }
+
     const r = await fetch(CONFIG.apiBase + "/compile", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        yaml: editor.value,
+        yaml: finalYaml,
         board: state.board.id,
         branch: state.branch,
         runner: state.runner,
