@@ -14,6 +14,12 @@ void lvgl_port_ppa_v9_init(lv_display_t *display);
 }
 #endif
 
+#ifdef USE_LVGL_FPS_BENCHMARK
+extern "C" {
+void lvgl_fps_benchmark_attach(lv_display_t *display);
+}
+#endif
+
 #include <cstring>
 #include <numeric>
 
@@ -868,6 +874,12 @@ void LvglComponent::setup() {
   // RGB565 SW blend paths (text, gradients post-rasterize, partial blends).
   // Complements the higher-level PPA draw unit in lv_draw_ppa.c.
   lvgl_port_ppa_v9_init(this->disp_);
+#endif
+
+#ifdef USE_LVGL_FPS_BENCHMARK
+  // Espressif esp_lvgl_adapter FPS sampler — prints a P10/25/50/75/90
+  // report after ~200 samples (or sustained low-FPS detection).
+  lvgl_fps_benchmark_attach(this->disp_);
 #endif
 }
 

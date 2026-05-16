@@ -90,6 +90,7 @@ CODEOWNERS = ["@youkorr"]  # LVGL 9.5.0 implementation with ThorVG enabled by de
 HELLO_WORLD_FILE = "hello_world.yaml"
 CONF_USE_PPA = "use_ppa"
 CONF_USE_PPA_IMG = "use_ppa_img"
+CONF_USE_FPS_BENCHMARK = "fps_benchmark"
 
 
 SIMPLE_TRIGGERS = (
@@ -275,6 +276,9 @@ async def to_code(configs):
     if use_ppa_img:
         # Enable PPA SRM hardware rotation for images (0/90/180/270 degrees)
         cg.add_define("LV_USE_PPA_IMG")
+    if config_0.get(CONF_USE_FPS_BENCHMARK, False):
+        # Espressif esp_lvgl_adapter FPS sampler (P10/25/50/75/90 report).
+        cg.add_define("USE_LVGL_FPS_BENCHMARK")
     df.add_define("LV_USE_STDLIB_MALLOC", "LV_STDLIB_CUSTOM")
 
     # ============================================
@@ -648,6 +652,7 @@ LVGL_SCHEMA = cv.All(
                 cv.Optional(df.CONF_RESUME_ON_INPUT, default=True): cv.boolean,
                 cv.Optional(CONF_USE_PPA, default=False): cv.boolean,
                 cv.Optional(CONF_USE_PPA_IMG, default=False): cv.boolean,
+                cv.Optional(CONF_USE_FPS_BENCHMARK, default=False): cv.boolean,
             }
         )
         .extend(DISP_BG_SCHEMA),
