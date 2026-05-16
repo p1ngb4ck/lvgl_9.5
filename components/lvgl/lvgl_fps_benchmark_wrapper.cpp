@@ -9,7 +9,7 @@
 #ifdef USE_LVGL_FPS_BENCHMARK
 
 extern "C" {
-#include "lvgl_fps_benchmark.c"
+#include "fps/lvgl_fps_benchmark.c"
 }
 
 #endif /* USE_LVGL_FPS_BENCHMARK */
