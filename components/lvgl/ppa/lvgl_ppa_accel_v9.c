@@ -32,7 +32,7 @@
 #define LVGL_PORT_PPA_ALIGN_UP(s, a)  (((s) + ((a) - 1)) & ~((a) - 1))
 #define LVGL_PORT_PPA_MIN_AREA_PX     100
 
-static const char *TAG = "ppa_v9";
+static const char *TAG_V9 = "ppa_v9";
 
 static ppa_client_handle_t s_blend_handle = NULL;
 static ppa_client_handle_t s_fill_handle = NULL;
@@ -160,7 +160,7 @@ static void ppa_blend(lv_color_t *bg_buf, const lv_area_t *bg_area, const lv_col
 
     esp_err_t err = ppa_do_blend(s_blend_handle, &cfg);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "ppa_do_blend failed: %d", err);
+        ESP_LOGW(TAG_V9, "ppa_do_blend failed: %d", err);
     }
 }
 
@@ -184,15 +184,15 @@ static void ppa_fill(lv_color_t *bg_buf, const lv_area_t *bg_area, const lv_area
             .block_offset_y = block_area->y1 - bg_area->y1,
             .fill_cm = PPA_FILL_COLOR_MODE_RGB565,
         },
-        .fill_block_w = lv_area_get_width(block_area),
-        .fill_block_h = lv_area_get_height(block_area),
-        .fill_argb_color.val = argb,
+        .fill_block_w = (uint32_t)lv_area_get_width(block_area),
+        .fill_block_h = (uint32_t)lv_area_get_height(block_area),
         .mode = PPA_TRANS_MODE_BLOCKING,
     };
+    cfg.fill_argb_color.val = argb;
 
     esp_err_t err = ppa_do_fill(s_fill_handle, &cfg);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "ppa_do_fill failed: %d", err);
+        ESP_LOGW(TAG_V9, "ppa_do_fill failed: %d", err);
     }
 }
 
@@ -248,7 +248,7 @@ static void lv_draw_ppa_v9_sw_fallback(lv_draw_task_t *t, const lv_draw_sw_blend
     image_dsc.src_stride = dsc->src_stride ? dsc->src_stride : (lv_area_get_width(src_area) * src_px_size);
     image_dsc.src_color_format = dsc->src_color_format;
 
-    const uint8_t *src_buf = dsc->src_buf;
+    const uint8_t *src_buf = (const uint8_t *)dsc->src_buf;
     src_buf += (size_t)(blend_area.y1 - src_area->y1) * image_dsc.src_stride;
     src_buf += (size_t)(blend_area.x1 - src_area->x1) * src_px_size;
     image_dsc.src_buf = src_buf;
@@ -370,7 +370,7 @@ static void lv_draw_ppa_v9_handler(lv_draw_task_t *t, const lv_draw_sw_blend_dsc
 void lvgl_port_ppa_v9_init(lv_display_t *display)
 {
     if (!display || lv_display_get_color_format(display) != LV_COLOR_FORMAT_RGB565) {
-        ESP_LOGI(TAG, "skip: display not RGB565");
+        ESP_LOGI(TAG_V9, "skip: display not RGB565");
         return;
     }
 
@@ -379,13 +379,13 @@ void lvgl_port_ppa_v9_init(lv_display_t *display)
         ppa_client_config_t fill_cfg = { .oper_type = PPA_OPERATION_FILL };
         esp_err_t err = ppa_register_client(&blend_cfg, &s_blend_handle);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "ppa blend client register failed: %d", err);
+            ESP_LOGE(TAG_V9, "ppa blend client register failed: %d", err);
             s_blend_handle = NULL;
             return;
         }
         err = ppa_register_client(&fill_cfg, &s_fill_handle);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "ppa fill client register failed: %d", err);
+            ESP_LOGE(TAG_V9, "ppa fill client register failed: %d", err);
             ppa_unregister_client(s_blend_handle);
             s_blend_handle = NULL;
             s_fill_handle = NULL;
