@@ -33,15 +33,19 @@ static const char *const TAG = "lvgl";
 static volatile uint32_t s_cpu_pct = 0;
 }  // namespace esphome::lvgl
 
-// Linker wrap (PlatformIO LDFLAG -Wl,--wrap=lv_timer_get_idle).
-// LVGL sysmon's perf widget formats CPU%% as 100 - lv_timer_get_idle().
-// Intercept the getter and return 100 - our_cpu_pct so the on-screen
-// overlay reads the same number we already log every second
-// ('[D][lvgl]: perf: CPU X%%'). Defined outside the namespace so the
-// linker resolves the symbol with C linkage. __real_lv_timer_get_idle
-// (LVGL's original) is intentionally unused — the wrap fully replaces
-// the value.
+// Linker wrap (PlatformIO LDFLAGs -Wl,--wrap=lv_timer_get_idle and
+// -Wl,--wrap=lv_os_get_idle_percent).
+// LVGL sysmon's perf widget reads CPU%% via lv_os_get_idle_percent()
+// when LV_USE_OS=LV_OS_FREERTOS (and via lv_timer_get_idle() under
+// LV_OS_NONE). Wrap both so the overlay reads our s_cpu_pct regardless
+// of the OS mode. Returns 100 - cpu, the "idle %" sysmon expects.
 extern "C" uint32_t __wrap_lv_timer_get_idle(void) {
+  uint32_t cpu = esphome::lvgl::s_cpu_pct;
+  if (cpu > 100) cpu = 100;
+  return 100 - cpu;
+}
+
+extern "C" uint32_t __wrap_lv_os_get_idle_percent(void) {
   uint32_t cpu = esphome::lvgl::s_cpu_pct;
   if (cpu > 100) cpu = 100;
   return 100 - cpu;

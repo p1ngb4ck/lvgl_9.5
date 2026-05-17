@@ -295,12 +295,13 @@ async def to_code(configs):
         # Signal lvgl_build_filter.py to keep src/debugging/sysmon/* sources
         # (excluded by default to save flash).
         cg.add_build_flag("-DLVGL_USE_SYSMON=1")
-        # Linker wrap: sysmon reads lv_timer_get_idle() to compute the CPU%%
-        # shown on the overlay; LVGL's internal accounting is broken under
-        # LV_USE_OS=LV_OS_FREERTOS. Redirect the call to our wrapper in
-        # lvgl_esphome.cpp which returns the same value as the
-        # '[D][lvgl]: perf:' log (flush wait excluded).
+        # Linker wrap: sysmon reads idle%% via lv_timer_get_idle() under
+        # LV_OS_NONE or lv_os_get_idle_percent() under LV_OS_FREERTOS.
+        # Wrap both — our matching __wrap_* live in lvgl_esphome.cpp and
+        # return 100 - our_cpu_pct so the overlay reads the same value
+        # as the '[D][lvgl]: perf:' log (flush wait excluded).
         cg.add_build_flag("-Wl,--wrap=lv_timer_get_idle")
+        cg.add_build_flag("-Wl,--wrap=lv_os_get_idle_percent")
     df.add_define("LV_USE_STDLIB_MALLOC", "LV_STDLIB_CUSTOM")
 
     # ============================================
