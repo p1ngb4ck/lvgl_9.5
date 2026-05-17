@@ -27,6 +27,28 @@ void lvgl_fps_attach_v2(lv_display_t *display);
 namespace esphome::lvgl {
 static const char *const TAG = "lvgl";
 
+// Published CPU% (real work, flush wait excluded) for the LVGL sysmon
+// overlay. Updated each second by loop(). Read by __wrap_lv_timer_get_idle
+// below to override lv_sysmon's broken FreeRTOS-mode CPU calculation.
+static volatile uint32_t s_cpu_pct = 0;
+}  // namespace esphome::lvgl
+
+// Linker wrap (PlatformIO LDFLAG -Wl,--wrap=lv_timer_get_idle).
+// LVGL sysmon's perf widget formats CPU%% as 100 - lv_timer_get_idle().
+// Intercept the getter and return 100 - our_cpu_pct so the on-screen
+// overlay reads the same number we already log every second
+// ('[D][lvgl]: perf: CPU X%%'). Defined outside the namespace so the
+// linker resolves the symbol with C linkage. __real_lv_timer_get_idle
+// (LVGL's original) is intentionally unused — the wrap fully replaces
+// the value.
+extern "C" uint32_t __wrap_lv_timer_get_idle(void) {
+  uint32_t cpu = esphome::lvgl::s_cpu_pct;
+  if (cpu > 100) cpu = 100;
+  return 100 - cpu;
+}
+
+namespace esphome::lvgl {
+
 #ifdef USE_LVGL_PPA
 /// Dedicated PPA SRM client for display framebuffer rotation (separate from LVGL draw unit).
 static ppa_client_handle_t s_display_srm_client = nullptr;
@@ -945,6 +967,7 @@ void LvglComponent::loop() {
                             : 0;
       uint32_t cpu_pct = (uint32_t)((cpu_us * 100ULL) / elapsed_us);
       if (cpu_pct > 100) cpu_pct = 100;
+      s_cpu_pct = cpu_pct;  // publish to __wrap_lv_timer_get_idle
       ESP_LOGD(TAG, "perf: CPU %u%% (render %llu us, flush %llu us / wall %llu us)",
                (unsigned)cpu_pct,
                (unsigned long long)cpu_us,
