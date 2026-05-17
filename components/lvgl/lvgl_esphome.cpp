@@ -472,10 +472,14 @@ void LvglComponent::draw_buffer_(const lv_area_t *area, lv_color_data *ptr) {
 
 void LvglComponent::flush_cb_(lv_display_t *disp_drv, const lv_area_t *area, uint8_t *color_p) {
   if (!this->is_paused()) {
-    auto now = millis();
+    uint64_t t0 = esp_timer_get_time();
     this->draw_buffer_(area, reinterpret_cast<lv_color_data *>(color_p));
-    ESP_LOGV(TAG, "flush_cb, area=%d/%d, %d/%d took %dms", area->x1, area->y1, lv_area_get_width(area),
-             lv_area_get_height(area), (int) (millis() - now));
+    uint64_t dt = esp_timer_get_time() - t0;
+    // Track flush wait time so loop() can subtract it when computing
+    // CPU%% — the synchronous DMA push isn't real CPU work.
+    this->perf_flush_us_ += dt;
+    ESP_LOGV(TAG, "flush_cb, area=%d/%d, %d/%d took %llu us", area->x1, area->y1, lv_area_get_width(area),
+             lv_area_get_height(area), (unsigned long long)dt);
   }
   lv_display_flush_ready(disp_drv);
 }
@@ -923,9 +927,10 @@ void LvglComponent::loop() {
     if (this->paused_ && this->show_snow_)
       this->write_random_();
   } else {
-    // Time the LVGL handler so we can report a real CPU%% — same source
-    // as a custom label widget that uses FreeRTOS task stats would, but
-    // measured directly from how much wall time we spend in LVGL work.
+    // Time the LVGL handler. flush_cb_ separately accumulates the DSI
+    // DMA wait into perf_flush_us_; subtract it so the reported CPU%%
+    // counts only real render work (matches lvgl_camera_display's
+    // approach: cpu_time / frame_interval).
     uint64_t t0 = esp_timer_get_time();
     lv_timer_handler();
     uint64_t t1 = esp_timer_get_time();
@@ -935,13 +940,18 @@ void LvglComponent::loop() {
       this->perf_window_start_us_ = now_us;
     uint64_t elapsed_us = now_us - this->perf_window_start_us_;
     if (elapsed_us >= 1000000) {
-      uint32_t cpu_pct = (uint32_t)((this->perf_busy_us_ * 100ULL) / elapsed_us);
+      uint64_t cpu_us = (this->perf_busy_us_ > this->perf_flush_us_)
+                            ? (this->perf_busy_us_ - this->perf_flush_us_)
+                            : 0;
+      uint32_t cpu_pct = (uint32_t)((cpu_us * 100ULL) / elapsed_us);
       if (cpu_pct > 100) cpu_pct = 100;
-      ESP_LOGD(TAG, "perf: CPU %u%% (busy %llu us / wall %llu us)",
+      ESP_LOGD(TAG, "perf: CPU %u%% (render %llu us, flush %llu us / wall %llu us)",
                (unsigned)cpu_pct,
-               (unsigned long long)this->perf_busy_us_,
+               (unsigned long long)cpu_us,
+               (unsigned long long)this->perf_flush_us_,
                (unsigned long long)elapsed_us);
       this->perf_busy_us_ = 0;
+      this->perf_flush_us_ = 0;
       this->perf_window_start_us_ = now_us;
     }
   }
