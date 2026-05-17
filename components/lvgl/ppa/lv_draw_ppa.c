@@ -30,7 +30,7 @@ static uint32_t s_ppa_imgs_rotated   = 0;
 static uint32_t s_ppa_eval_called    = 0;
 static int64_t  s_ppa_stats_last_us  = 0;
 
-static void ppa_stats_maybe_log(void) {
+static void ppa_draw_stats_maybe_log(void) {
 #if PPA_STATS_INTERVAL_MS > 0
     int64_t now = esp_timer_get_time();
     if (s_ppa_stats_last_us == 0) s_ppa_stats_last_us = now;
@@ -129,7 +129,7 @@ void lv_draw_ppa_deinit(void)
  **********************/
 static int32_t ppa_evaluate(lv_draw_unit_t * draw_unit, lv_draw_task_t * t)
 {
-    ppa_stats_maybe_log();
+    ppa_draw_stats_maybe_log();
     s_ppa_eval_called++;
     switch(t->type) {
         case LV_DRAW_TASK_TYPE_FILL: {
