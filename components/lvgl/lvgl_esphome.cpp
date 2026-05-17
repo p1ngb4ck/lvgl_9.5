@@ -217,6 +217,14 @@ void LvglComponent::dump_config() {
                 "  Rotation: %d\n"
                 "  Draw rounding: %d",
                 this->width_, this->height_, 100 / this->buffer_frac_, this->rotation, (int) this->draw_rounding);
+#ifdef USE_LVGL_PPA
+  ESP_LOGCONFIG(TAG, "  PPA SRM (display rotation): %s",
+                s_display_srm_client != nullptr ? "registered (HW)" : "failed (SW fallback)");
+  ESP_LOGCONFIG(TAG, "  PPA SW-blend handler (v9):  registered (RGB565 fills/blends → HW)");
+  ESP_LOGCONFIG(TAG, "  PPA draw unit:              disabled (matches Espressif esp_lvgl_adapter)");
+#else
+  ESP_LOGCONFIG(TAG, "  PPA acceleration: disabled (use_ppa: false)");
+#endif
 }
 
 void LvglComponent::set_paused(bool paused, bool show_snow) {
