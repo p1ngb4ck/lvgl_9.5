@@ -17,8 +17,6 @@
 
 #ifdef USE_LVGL_FPS_BENCHMARK
 
-extern "C" {
-
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -87,7 +85,7 @@ static uint32_t percentile(const uint32_t *sorted, uint32_t count, float pct)
     return sorted[idx];
 }
 
-void lvgl_fps_benchmark_print(void)
+extern "C" void lvgl_fps_benchmark_print(void)
 {
     if (!s_ctx.mutex) return;
     if (xSemaphoreTake(s_ctx.mutex, pdMS_TO_TICKS(2000)) != pdTRUE) return;
@@ -276,7 +274,7 @@ static void fps_sampler_task(void *arg)
     vTaskDelete(NULL);
 }
 
-void lvgl_fps_attach_v2(lv_display_t *display)
+extern "C" void lvgl_fps_attach_v2(lv_display_t *display)
 {
     /* Log unconditionally on entry so we can verify this TU is linked
        and the call site reaches us. */
@@ -311,7 +309,5 @@ void lvgl_fps_attach_v2(lv_display_t *display)
     }
     ESP_LOGI(TAG_FPS, "<<< attach() done, warmup %d ms", FPS_STARTUP_DELAY_MS);
 }
-
-}  /* extern "C" */
 
 #endif /* USE_LVGL_FPS_BENCHMARK */
