@@ -27,6 +27,17 @@ void lvgl_fps_benchmark_attach(lv_display_t *display);
 namespace esphome::lvgl {
 static const char *const TAG = "lvgl";
 
+// Accumulated time (ms) spent waiting on synchronous panel DMA flushes.
+// Subtracted from the millis() value reported to LVGL so that lv_timer's
+// idle accounting (and therefore sysmon's CPU%) excludes flush-wait,
+// which is not actual CPU work. Kept on the same millis() base as the
+// rest of ESPHome to avoid mid-flight reference-frame mismatches.
+static volatile uint32_t s_flush_pause_ms = 0;
+
+static uint32_t lvgl_tick_cb() {
+  return millis() - s_flush_pause_ms;
+}
+
 #ifdef USE_LVGL_PPA
 /// Dedicated PPA SRM client for display framebuffer rotation (separate from LVGL draw unit).
 static ppa_client_handle_t s_display_srm_client = nullptr;
@@ -462,17 +473,6 @@ void LvglComponent::draw_buffer_(const lv_area_t *area, lv_color_data *ptr) {
     display->draw_pixels_at(x1, y1, width, height, (const uint8_t *) dst, display::COLOR_ORDER_RGB, LV_BITNESS,
                             this->big_endian_);
   }
-}
-
-// Accumulated time (ms) spent waiting on synchronous panel DMA flushes.
-// Subtracted from the millis() value reported to LVGL so that lv_timer's
-// idle accounting (and therefore sysmon's CPU%) excludes flush-wait,
-// which is not actual CPU work. Keep the base aligned with millis() to
-// match the rest of the LVGL/ESPHome tick references.
-static volatile uint32_t s_flush_pause_ms = 0;
-
-static uint32_t lvgl_tick_cb() {
-  return millis() - s_flush_pause_ms;
 }
 
 void LvglComponent::flush_cb_(lv_display_t *disp_drv, const lv_area_t *area, uint8_t *color_p) {
