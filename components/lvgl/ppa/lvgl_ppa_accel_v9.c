@@ -32,7 +32,7 @@
 #define LVGL_PORT_PPA_ALIGN_UP(s, a)  (((s) + ((a) - 1)) & ~((a) - 1))
 #define LVGL_PORT_PPA_MIN_AREA_PX     100
 
-static const char *TAG_V9 = "ppa_v9";
+static const char *TAG_V9 = "lvgl";  /* reuse the lvgl tag — known to pass user log filters */
 
 /* Instrumentation: how many ops landed on hardware vs the SW fallback,
    reported once every PPA_STATS_INTERVAL_MS to confirm acceleration is
@@ -57,7 +57,7 @@ static void ppa_stats_maybe_log(void) {
         uint32_t total = s_ppa_hw_fills + s_ppa_hw_blends + s_ppa_sw_fallback;
         if (total > 0) {
             uint32_t hw = s_ppa_hw_fills + s_ppa_hw_blends;
-            ESP_LOGI(TAG_V9, "ops/2s: HW=%lu (fill=%lu, blend=%lu)  SW=%lu  hw_ratio=%lu%%",
+            ESP_LOGI(TAG_V9, "PPA ops/2s: HW=%lu (fill=%lu, blend=%lu)  SW=%lu  hw_ratio=%lu%%",
                      (unsigned long)hw, (unsigned long)s_ppa_hw_fills,
                      (unsigned long)s_ppa_hw_blends, (unsigned long)s_ppa_sw_fallback,
                      (unsigned long)(hw * 100 / total));
