@@ -26,7 +26,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-static const char *TAG_FPS = "lvgl_fps";
+static const char *TAG_FPS = "lvgl";  /* reuse the lvgl tag — known to pass user log filters */
 
 #define FPS_STARTUP_DELAY_MS         5000
 #define FPS_SAMPLE_PERIOD_MS         500
@@ -312,7 +312,7 @@ void lvgl_fps_benchmark_attach(lv_display_t *display)
 #else  /* !USE_LVGL_FPS_BENCHMARK */
 
 #include "esp_log.h"
-static const char *TAG_FPS_STUB = "lvgl_fps";
+static const char *TAG_FPS_STUB = "lvgl";
 void lvgl_fps_benchmark_attach(lv_display_t *display) {
     (void)display;
     /* If you see this log, the stub linked instead of the real impl —

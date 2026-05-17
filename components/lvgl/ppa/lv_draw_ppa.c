@@ -16,7 +16,7 @@
  *********************/
 #define PPA_BUF_ALIGN     16  /* PPA needs at least 16-byte aligned buffers (128-bit burst) */
 
-static const char * TAG = "ppa_draw";
+static const char * TAG = "lvgl";  /* reuse the lvgl tag — known to pass user log filters */
 
 #include "esp_log.h"
 #include "esp_timer.h"
