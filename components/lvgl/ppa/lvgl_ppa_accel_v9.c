@@ -122,7 +122,9 @@ static void ppa_cache_sync_region(const lv_area_t *area, const lv_area_t *buf_ar
     uintptr_t aligned_addr = addr & ~(align - 1);
     size_t total = LVGL_PORT_PPA_ALIGN_UP(bytes + (addr - aligned_addr), align);
 
-    esp_cache_msync((void *)aligned_addr, total, flag);
+    /* LVGL PR #10107: tolerate unaligned regions (kernel handles partial
+     * leading/trailing cache lines instead of rejecting the call). */
+    esp_cache_msync((void *)aligned_addr, total, flag | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
 }
 
 static void ppa_cache_invalidate(const lv_area_t *area, const lv_area_t *buf_area, lv_color_t *buf)
@@ -392,7 +394,8 @@ static void lv_draw_ppa_v9_handler(lv_draw_task_t *t, const lv_draw_sw_blend_dsc
                                (size_t)lv_area_get_width(&block_area) * lv_area_get_height(&block_area) * src_px_size +
                                (src_addr - src_aligned), align);
         if (esp_ptr_external_ram((void *)dsc->src_buf)) {
-            esp_cache_msync((void *)src_aligned, src_total, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+            esp_cache_msync((void *)src_aligned, src_total,
+                            ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
         }
 
         uint16_t src_stride_px = src_stride / src_px_size;
