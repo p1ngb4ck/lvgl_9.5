@@ -248,7 +248,7 @@ void LvglComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "  PPA SRM (display rotation): %s",
                 s_display_srm_client != nullptr ? "registered (HW)" : "failed (SW fallback)");
   ESP_LOGCONFIG(TAG, "  PPA SW-blend handler (v9):  registered (RGB565 fills/blends → HW)");
-  ESP_LOGCONFIG(TAG, "  PPA draw unit:              disabled (matches Espressif esp_lvgl_adapter)");
+  ESP_LOGCONFIG(TAG, "  PPA draw unit:              registered (canvas/image → HW)");
 #else
   ESP_LOGCONFIG(TAG, "  PPA acceleration: disabled (use_ppa: false)");
 #endif
@@ -270,16 +270,22 @@ void LvglComponent::set_paused(bool paused, bool show_snow) {
 void LvglComponent::esphome_lvgl_init() {
   lv_init();
 #ifdef USE_LVGL_PPA
-  // Espressif esp_lvgl_adapter matches: PPA acceleration goes through the
-  // SW blend handler (lvgl_ppa_accel_v9.c) hooked via
-  // lv_draw_sw_register_blend_handler — not a separate draw unit. The
-  // adapter has NO full PPA draw unit. Disabling lv_draw_ppa_init() here
-  // gives RGB565 blends/fills to the SW pipeline where v9 intercepts them
-  // and dispatches to PPA hardware. This matches the upstream Espressif
-  // benchmark behavior.
+  // Two PPA paths active at once for max coverage:
   //
-  // (Old code: lv_draw_ppa_init();  — kept the source for fallback but
-  // dead-code at runtime as long as this call is commented.)
+  //   1) lv_draw_ppa unit (full draw unit, lv_draw_ppa_init)
+  //      → accelerates IMAGE draw tasks (canvas widget, lv_image)
+  //      → critical for camera streaming through lv_canvas
+  //
+  //   2) lvgl_ppa_accel_v9 (SW-blend handler, lvgl_port_ppa_v9_init)
+  //      → accelerates RGB565 fills/blends in the SW pipeline
+  //      → catches what the draw unit rejects (radius != 0, opa < max,
+  //        gradients, etc.)
+  //
+  // Espressif's esp_lvgl_adapter only uses (2), but that leaves canvas/
+  // image draws going through the slow SW image renderer. With a 640x480
+  // RGB565 camera canvas, this added ~50 ms of LVGL overhead per frame.
+  // Enabling (1) brings image drawing back onto PPA hardware.
+  lv_draw_ppa_init();
 
   // Register a dedicated PPA SRM client for display framebuffer rotation.
   // This is independent of the LVGL draw pipeline and stays enabled.
