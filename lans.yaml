@@ -12,7 +12,7 @@ substitutions:
   timer_finished_illustration_file: https://raw.githubusercontent.com/youkorr/speaker-box/refs/heads/main/images/timer.png
 
   #camera
-  frigate: "http://192.168.1.38:8123/local/llmvision/frigate1.png"
+  frigate: "http://:8123/local/llmvision/frigate1.png"
   #mediaplayer
   
   media_player: media_player.speaker_box_acc148_media_player #HA KC media player entity id
@@ -182,7 +182,7 @@ logger:
   level: DEBUG
 api:
   encryption:
-    key: qGPxWo0Gfi6RQy6wrdgvioqaUgcsDe5ojYYT+fxrgEE=
+    key: 
   custom_services: true
 ota:
   - platform: esphome
@@ -191,9 +191,9 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   manual_ip:
-    static_ip: 192.168.1.24
-    gateway: 192.168.1.1
-    subnet: 255.255.255.0
+    static_ip: 
+    gateway: 
+    subnet: 
 sd_mmc_card:
   id: sd_card
   clk_pin: GPIO14
@@ -237,21 +237,6 @@ webdavbox3:
 
 external_components:
 
-
-
-  #- source:
-      #type: git
-      #url: https://github.com/youkorr/sd_mmc_card
-      #ref: main
-    #components: [sd_mmc_card, storage]
-    #refresh: 1min
-  #- source:
-      #type: git
-      #url: https://github.com/youkorr/webdavbox3
-      #ref: main
-    #components: [webdavbox3]
-    #refresh: 0s 
-
   - source:
       type: git
       url: https://github.com/youkorr/lvgl_9.5
@@ -262,27 +247,13 @@ external_components:
   - source:
       type: git
       url: https://github.com/youkorr/test2_esp_video_esphome
-      ref: main #claude/fix-camera-h264-Grgbl #claude/yolo-esp32-camera-support-Ian86 #claude/add-webp-storage-support-BtuK2 #claude/usb-media-storage-zNT22 #claude/fix-mp4-stuttering-QWMcU #claude/fix-esphome-ff-header-LUVh2  #claude/optimize-face-detection-memory-0mKRM #claude/decouple-esp-video-Hr7PK
+      ref: main 
     components: [sd_mmc_card, webdavbox3]
     refresh: always  
-  #- source: github://pr#9605
-    #components: [lvgl]
-    #refresh: 1h
-  #- source:
-      #type: git
-      #url: https://github.com/youkorr/ftp_server
-      #ref: main
-    #components: [sd_mmc_card]
-    #refresh: 0s   
-    
-
+ 
   - source: github://pr#15703
     components: [micro_wake_word]
     refresh: always
-
-
-
-
 
 
 color:
