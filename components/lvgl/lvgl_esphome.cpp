@@ -8,8 +8,16 @@
 
 #ifdef USE_LVGL_PPA
 #include "driver/ppa.h"
+#include "esp_timer.h"
 extern "C" {
 void lv_draw_ppa_init(void);
+void lvgl_port_ppa_v9_init(lv_display_t *display);
+}
+#endif
+
+#ifdef USE_LVGL_FPS_BENCHMARK
+extern "C" {
+void lvgl_fps_attach_v2(lv_display_t *display);
 }
 #endif
 
@@ -18,6 +26,32 @@ void lv_draw_ppa_init(void);
 
 namespace esphome::lvgl {
 static const char *const TAG = "lvgl";
+
+// Published CPU% (real work, flush wait excluded) for the LVGL sysmon
+// overlay. Updated each second by loop(). Read by __wrap_lv_timer_get_idle
+// below to override lv_sysmon's broken FreeRTOS-mode CPU calculation.
+static volatile uint32_t s_cpu_pct = 0;
+}  // namespace esphome::lvgl
+
+// Linker wrap (PlatformIO LDFLAGs -Wl,--wrap=lv_timer_get_idle and
+// -Wl,--wrap=lv_os_get_idle_percent).
+// LVGL sysmon's perf widget reads CPU%% via lv_os_get_idle_percent()
+// when LV_USE_OS=LV_OS_FREERTOS (and via lv_timer_get_idle() under
+// LV_OS_NONE). Wrap both so the overlay reads our s_cpu_pct regardless
+// of the OS mode. Returns 100 - cpu, the "idle %" sysmon expects.
+extern "C" uint32_t __wrap_lv_timer_get_idle(void) {
+  uint32_t cpu = esphome::lvgl::s_cpu_pct;
+  if (cpu > 100) cpu = 100;
+  return 100 - cpu;
+}
+
+extern "C" uint32_t __wrap_lv_os_get_idle_percent(void) {
+  uint32_t cpu = esphome::lvgl::s_cpu_pct;
+  if (cpu > 100) cpu = 100;
+  return 100 - cpu;
+}
+
+namespace esphome::lvgl {
 
 #ifdef USE_LVGL_PPA
 /// Dedicated PPA SRM client for display framebuffer rotation (separate from LVGL draw unit).
@@ -38,9 +72,10 @@ static bool ppa_rotate_display_buf(const void *src, void *dst, int32_t w, int32_
     return false;
 
   // ESP32-P4 PPA requires both buffer address and buffer_size to be aligned
-  // to the data cache line size (64 bytes). If inputs aren't aligned, fall
-  // back to software rotation rather than flood the log with PPA errors.
-  constexpr uintptr_t CACHE_LINE = 64;
+  // to the data cache line size — 64 B by default, 128 B if
+  // CONFIG_CACHE_L2_CACHE_LINE_128B=y. Use the larger value so the check
+  // passes under both sdkconfigs.
+  constexpr uintptr_t CACHE_LINE = 128;
   if ((reinterpret_cast<uintptr_t>(src) & (CACHE_LINE - 1)) != 0)
     return false;
   if ((reinterpret_cast<uintptr_t>(dst) & (CACHE_LINE - 1)) != 0)
@@ -209,6 +244,14 @@ void LvglComponent::dump_config() {
                 "  Rotation: %d\n"
                 "  Draw rounding: %d",
                 this->width_, this->height_, 100 / this->buffer_frac_, this->rotation, (int) this->draw_rounding);
+#ifdef USE_LVGL_PPA
+  ESP_LOGCONFIG(TAG, "  PPA SRM (display rotation): %s",
+                s_display_srm_client != nullptr ? "registered (HW)" : "failed (SW fallback)");
+  ESP_LOGCONFIG(TAG, "  PPA SW-blend handler (v9):  registered (RGB565 fills/blends → HW)");
+  ESP_LOGCONFIG(TAG, "  PPA draw unit:              registered (canvas/image → HW)");
+#else
+  ESP_LOGCONFIG(TAG, "  PPA acceleration: disabled (use_ppa: false)");
+#endif
 }
 
 void LvglComponent::set_paused(bool paused, bool show_snow) {
@@ -227,13 +270,25 @@ void LvglComponent::set_paused(bool paused, bool show_snow) {
 void LvglComponent::esphome_lvgl_init() {
   lv_init();
 #ifdef USE_LVGL_PPA
-  // Initialize PPA draw unit after lv_init()
-  // Uses custom PPA code (based on https://github.com/lvgl/lvgl/pull/9162)
-  // LVGL 9.5 includes this fix natively; kept as fallback
+  // Two PPA paths active at once for max coverage:
+  //
+  //   1) lv_draw_ppa unit (full draw unit, lv_draw_ppa_init)
+  //      → accelerates IMAGE draw tasks (canvas widget, lv_image)
+  //      → critical for camera streaming through lv_canvas
+  //
+  //   2) lvgl_ppa_accel_v9 (SW-blend handler, lvgl_port_ppa_v9_init)
+  //      → accelerates RGB565 fills/blends in the SW pipeline
+  //      → catches what the draw unit rejects (radius != 0, opa < max,
+  //        gradients, etc.)
+  //
+  // Espressif's esp_lvgl_adapter only uses (2), but that leaves canvas/
+  // image draws going through the slow SW image renderer. With a 640x480
+  // RGB565 camera canvas, this added ~50 ms of LVGL overhead per frame.
+  // Enabling (1) brings image drawing back onto PPA hardware.
   lv_draw_ppa_init();
 
   // Register a dedicated PPA SRM client for display framebuffer rotation.
-  // Kept separate from the LVGL draw unit's SRM client to avoid contention.
+  // This is independent of the LVGL draw pipeline and stays enabled.
   if (s_display_srm_client == nullptr) {
     ppa_client_config_t srm_cfg = {};
     srm_cfg.oper_type = PPA_OPERATION_SRM;
@@ -450,10 +505,14 @@ void LvglComponent::draw_buffer_(const lv_area_t *area, lv_color_data *ptr) {
 
 void LvglComponent::flush_cb_(lv_display_t *disp_drv, const lv_area_t *area, uint8_t *color_p) {
   if (!this->is_paused()) {
-    auto now = millis();
+    uint64_t t0 = esp_timer_get_time();
     this->draw_buffer_(area, reinterpret_cast<lv_color_data *>(color_p));
-    ESP_LOGV(TAG, "flush_cb, area=%d/%d, %d/%d took %dms", area->x1, area->y1, lv_area_get_width(area),
-             lv_area_get_height(area), (int) (millis() - now));
+    uint64_t dt = esp_timer_get_time() - t0;
+    // Track flush wait time so loop() can subtract it when computing
+    // CPU%% — the synchronous DMA push isn't real CPU work.
+    this->perf_flush_us_ += dt;
+    ESP_LOGV(TAG, "flush_cb, area=%d/%d, %d/%d took %llu us", area->x1, area->y1, lv_area_get_width(area),
+             lv_area_get_height(area), (unsigned long long)dt);
   }
   lv_display_flush_ready(disp_drv);
 }
@@ -765,10 +824,12 @@ void LvglComponent::setup() {
   constexpr size_t BYTES_PER_PIXEL = LV_COLOR_DEPTH / 8;
 #endif
   auto buf_bytes = width * height / frac * BYTES_PER_PIXEL;
-  // Fix for issue #9868: Align buffer size to 64 bytes for PPA/cache compatibility
-  // on ESP32-P4. esp_cache_msync() requires both address AND size to be cache-line
-  // aligned (64 bytes). Without this, PPA operations fail on PSRAM buffers.
-  constexpr size_t BUF_SIZE_ALIGN = 64;
+  // Align buffer size to the data cache line (128 B if
+  // CONFIG_CACHE_L2_CACHE_LINE_128B=y, else 64 B is enough). 128 satisfies
+  // both — esp_cache_msync() + PPA require both address AND size to be
+  // cache-line aligned. Without this, PPA operations fail on PSRAM buffers
+  // ('out.buffer addr or out.buffer_size not aligned to cache line size').
+  constexpr size_t BUF_SIZE_ALIGN = 128;
   buf_bytes = (buf_bytes + BUF_SIZE_ALIGN - 1) & ~(BUF_SIZE_ALIGN - 1);
   void *buffer = nullptr;
 
@@ -777,13 +838,14 @@ void LvglComponent::setup() {
   // (required for PPA on ESP32-P4), then fall back to PSRAM with cache sync.
   auto alloc_draw_buf = [](size_t sz) -> void * {
 #if defined(USE_LVGL_PPA) && defined(USE_ESP32)
-    // Round size up to 64-byte cache line so PPA buffer_size checks pass
-    size_t aligned_sz = (sz + 63) & ~size_t{63};
-    void *p = heap_caps_aligned_alloc(64, aligned_sz, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    // Round size up to 128-byte cache line so PPA buffer_size checks pass
+    // on both 64 B and 128 B cache-line sdkconfigs.
+    size_t aligned_sz = (sz + 127) & ~size_t{127};
+    void *p = heap_caps_aligned_alloc(128, aligned_sz, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
     if (p != nullptr)
       return p;
-    // Internal DMA SRAM full → PSRAM (still 64-byte aligned, PPA can use it with cache sync)
-    p = heap_caps_aligned_alloc(64, aligned_sz, MALLOC_CAP_SPIRAM);
+    // Internal DMA SRAM full → PSRAM (128-byte aligned for 128 B cache line)
+    p = heap_caps_aligned_alloc(128, aligned_sz, MALLOC_CAP_SPIRAM);
     if (p != nullptr)
       return p;
 #endif
@@ -861,6 +923,23 @@ void LvglComponent::setup() {
   lv_display_set_buffers(this->disp_, this->draw_buf_, nullptr, this->buf_bytes_,
                          this->full_refresh_ ? LV_DISPLAY_RENDER_MODE_FULL : LV_DISPLAY_RENDER_MODE_PARTIAL);
   this->buffers_configured_ = true;
+
+#ifdef USE_LVGL_PPA
+  // Espressif esp-iot-solution PPA SW blend handler — accelerates all
+  // RGB565 SW blend paths (text, gradients post-rasterize, partial blends).
+  // Complements the higher-level PPA draw unit in lv_draw_ppa.c.
+  lvgl_port_ppa_v9_init(this->disp_);
+#endif
+
+#ifdef USE_LVGL_FPS_BENCHMARK
+  // Espressif esp_lvgl_adapter FPS sampler — prints a P10/25/50/75/90
+  // report after ~200 samples (or sustained low-FPS detection).
+  ESP_LOGI(TAG, "FPS benchmark: calling attach() for disp=%p", this->disp_);
+  lvgl_fps_attach_v2(this->disp_);
+  ESP_LOGI(TAG, "FPS benchmark: attach() returned");
+#else
+  ESP_LOGI(TAG, "FPS benchmark: not compiled in (USE_LVGL_FPS_BENCHMARK undefined)");
+#endif
 }
 
 void LvglComponent::update() {
@@ -884,7 +963,36 @@ void LvglComponent::loop() {
     if (this->paused_ && this->show_snow_)
       this->write_random_();
   } else {
+    // Time the LVGL handler. flush_cb_ separately accumulates the DSI
+    // DMA wait into perf_flush_us_; subtract it so the reported CPU%%
+    // counts only real render work (matches lvgl_camera_display's
+    // approach: cpu_time / frame_interval).
+    uint64_t t0 = esp_timer_get_time();
     lv_timer_handler();
+    uint64_t t1 = esp_timer_get_time();
+    this->perf_busy_us_ += (t1 - t0);
+    uint64_t now_us = t1;
+    if (this->perf_window_start_us_ == 0)
+      this->perf_window_start_us_ = now_us;
+    uint64_t elapsed_us = now_us - this->perf_window_start_us_;
+    if (elapsed_us >= 1000000) {
+      uint64_t cpu_us = (this->perf_busy_us_ > this->perf_flush_us_)
+                            ? (this->perf_busy_us_ - this->perf_flush_us_)
+                            : 0;
+      uint32_t cpu_pct = (uint32_t)((cpu_us * 100ULL) / elapsed_us);
+      if (cpu_pct > 100) cpu_pct = 100;
+      s_cpu_pct = cpu_pct;  // publish to __wrap_lv_timer_get_idle / sysmon overlay
+      // Verbose-only log: enable via 'logs: lvgl: VERBOSE' in YAML if you
+      // need the breakdown. Default DEBUG/INFO levels stay silent.
+      ESP_LOGV(TAG, "perf: CPU %u%% (render %llu us, flush %llu us / wall %llu us)",
+               (unsigned)cpu_pct,
+               (unsigned long long)cpu_us,
+               (unsigned long long)this->perf_flush_us_,
+               (unsigned long long)elapsed_us);
+      this->perf_busy_us_ = 0;
+      this->perf_flush_us_ = 0;
+      this->perf_window_start_us_ = now_us;
+    }
   }
 }
 

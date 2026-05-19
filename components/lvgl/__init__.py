@@ -90,6 +90,8 @@ CODEOWNERS = ["@youkorr"]  # LVGL 9.5.0 implementation with ThorVG enabled by de
 HELLO_WORLD_FILE = "hello_world.yaml"
 CONF_USE_PPA = "use_ppa"
 CONF_USE_PPA_IMG = "use_ppa_img"
+CONF_USE_FPS_BENCHMARK = "fps_benchmark"
+CONF_USE_PERF_MONITOR = "perf_monitor"
 
 
 SIMPLE_TRIGGERS = (
@@ -275,6 +277,31 @@ async def to_code(configs):
     if use_ppa_img:
         # Enable PPA SRM hardware rotation for images (0/90/180/270 degrees)
         cg.add_define("LV_USE_PPA_IMG")
+    if config_0.get(CONF_USE_FPS_BENCHMARK, False):
+        # Espressif esp_lvgl_adapter FPS sampler (P10/25/50/75/90 report).
+        # lvgl_fps_benchmark_wrapper.cpp includes esphome/core/defines.h
+        # and conditionally pulls in the .c — ESPHome only auto-compiles
+        # .cpp at the component root.
+        cg.add_define("USE_LVGL_FPS_BENCHMARK")
+    if config_0.get(CONF_USE_PERF_MONITOR, False):
+        # On-screen FPS/CPU overlay (bottom-right corner, native LVGL widget).
+        # Perf monitor is gated by LV_USE_SYSMON in lv_conf_internal.h, which
+        # is itself gated by LV_USE_LOG (text rendering for the label).
+        df.add_define("LV_USE_LOG", "1")
+        df.add_define("LV_USE_SYSMON", "1")
+        df.add_define("LV_USE_PERF_MONITOR", "1")
+        df.add_define("LV_USE_PERF_MONITOR_POS", "LV_ALIGN_BOTTOM_RIGHT")
+        df.add_define("LV_USE_PERF_MONITOR_LOG_MODE", "0")
+        # Signal lvgl_build_filter.py to keep src/debugging/sysmon/* sources
+        # (excluded by default to save flash).
+        cg.add_build_flag("-DLVGL_USE_SYSMON=1")
+        # Linker wrap: sysmon reads idle%% via lv_timer_get_idle() under
+        # LV_OS_NONE or lv_os_get_idle_percent() under LV_OS_FREERTOS.
+        # Wrap both — our matching __wrap_* live in lvgl_esphome.cpp and
+        # return 100 - our_cpu_pct so the overlay reads the same value
+        # as the '[D][lvgl]: perf:' log (flush wait excluded).
+        cg.add_build_flag("-Wl,--wrap=lv_timer_get_idle")
+        cg.add_build_flag("-Wl,--wrap=lv_os_get_idle_percent")
     df.add_define("LV_USE_STDLIB_MALLOC", "LV_STDLIB_CUSTOM")
 
     # ============================================
@@ -290,9 +317,19 @@ async def to_code(configs):
     df.add_define("LV_USE_LIBPNG", "0")
     df.add_define("LV_USE_LIBWEBP", "0")
 
-    # Enable FreeRTOS threading for LVGL draw operations
-    # Note: atomic.h shim added in components/lvgl/ for ESP-IDF compatibility
+    # Enable FreeRTOS threading for LVGL draw operations.
+    # Required by ThorVG / Lottie which render off the main LVGL task and
+    # rely on the OS abstraction's mutexes. Switching to LV_OS_NONE here
+    # makes those mutexes no-op and crashes the firmware at boot
+    # (OTA rolls back).
+    # Side effect: LVGL sysmon's CPU%% overlay reads 100%% — a known LVGL
+    # quirk with LV_OS_FREERTOS on ESPHome. Ignore the displayed CPU%%;
+    # the FPS and ms numbers are still accurate.
     df.add_define("LV_USE_OS", "LV_OS_FREERTOS")
+
+    # Refresh period: 15 ms ≈ 66 Hz attempt rate (recommended by LVGL
+    # community for smoother sysmon readings; doesn't force higher FPS).
+    df.add_define("LV_DEF_REFR_PERIOD", "15")
 
     # LVGL 9.5: Enable blur/frosted glass support (small code, useful for shadows)
     df.add_define("LV_USE_DRAW_SW_BLUR", "1")
@@ -648,6 +685,8 @@ LVGL_SCHEMA = cv.All(
                 cv.Optional(df.CONF_RESUME_ON_INPUT, default=True): cv.boolean,
                 cv.Optional(CONF_USE_PPA, default=False): cv.boolean,
                 cv.Optional(CONF_USE_PPA_IMG, default=False): cv.boolean,
+                cv.Optional(CONF_USE_FPS_BENCHMARK, default=False): cv.boolean,
+                cv.Optional(CONF_USE_PERF_MONITOR, default=False): cv.boolean,
             }
         )
         .extend(DISP_BG_SCHEMA),
