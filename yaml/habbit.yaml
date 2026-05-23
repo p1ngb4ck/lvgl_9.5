@@ -34,7 +34,7 @@ substitutions:
   media: media_player.habbit_desk_pro_habbit_desk_pro
   goal_current: sensor.aguacatec_suscriptores
   goal_target: 3000
-  goal_text: "A por los 3000 subs"
+  goal_text: "Objectif 3000 abonnés"
 
   light_ceiling: light.ventilador_estudio
   cover1: cover.estor_estudio_1
@@ -1161,7 +1161,7 @@ sensor:
             id: lbl_home_goal_current
             text: !lambda |-
               char buf[30];
-              snprintf(buf, sizeof(buf), "%.0f Suscriptores", x);
+              snprintf(buf, sizeof(buf), "%.0f Abonnés", x);
               return std::string(buf);
         - lvgl.label.update:
             id: lbl_home_goal_progress_value
@@ -2600,7 +2600,7 @@ lvgl:
       - label:
           align: TOP_LEFT
           id: lbl_date
-          text: "Lunes, 00/00/00"
+          text: "Lundi, 00/00/00"
           text_color: ${text_color_secondary}
           text_font: font_info_text
           pad_top: 25
@@ -2775,14 +2775,14 @@ lvgl:
               id: lbl_home_calendar_event_name
               x: 110
               y: -30
-              text: "Charla de Aguacatec"
+              text: "Aucun événement"
               text_color: 0xffffff
           - label:
               styles: style_home_media_artist
               id: lbl_home_calendar_event_details
               x: 110
               y: 10
-              text: "26/04/26, de 11:00 a 12:00"
+              text: "Aucun événement"
               text_color: 0xffffff
               text_opa: 50%
 
@@ -2824,14 +2824,14 @@ lvgl:
               id: lbl_home_media_title
               x: 110
               y: -30
-              text: "Héros du samedi"
+              text: ""
               text_color: 0xffffff
           - label:
               styles: style_home_media_artist
               id: lbl_home_media_artist
               x: 110
               y: 10
-              text: "La M.O.D.A."
+              text: ""
               text_color: 0xffffff
               text_opa: 50%
           - image:
@@ -2921,7 +2921,7 @@ lvgl:
               id: lbl_home_goal_current
               x: -30
               y: -30
-              text: "3000 Test"
+              text: "3000 Abonnés"
               text_color: 0xffffff
           - label:
               styles: progress_bar_label_estimated_time
@@ -3189,7 +3189,7 @@ lvgl:
                   - label:
                       id: lbl_menu_cover_status
                       styles: style_button_status
-                      text: "Fermé"
+                      text: "Fermés"
                       y: 20
                 on_press:
                   then:
@@ -3204,7 +3204,7 @@ lvgl:
                 widgets:
                   - label:
                       styles: style_button_text
-                      text: "éclairage"
+                      text: "Éclairage"
                       y: -20
                   - label:
                       id: lbl_menu_light_bar_status
