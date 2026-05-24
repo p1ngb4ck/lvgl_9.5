@@ -79,37 +79,46 @@ lottie_state_machine:
 
 # --- 4. Utilisation dans les automations ESPHome ---
 #
-# Exemple : changer d'état selon les événements
-
-# Quand une notification arrive → alerte
-text_sensor:
-  - platform: homeassistant
-    id: notification_text
-    entity_id: input_text.notifications
-    on_value:
-      then:
-        - if:
-            condition:
-              lambda: 'return !x.empty();'
-            then:
-              - lottie_state_machine.set_state:
-                  id: robot_sm
-                  state: alert
-            else:
-              - lottie_state_machine.set_state:
-                  id: robot_sm
-                  state: idle
-
-# Quand le voice assistant s'active → actif
-voice_assistant:
-  on_wake_word_detected:
-    - lottie_state_machine.set_state:
-        id: robot_sm
-        state: active
-  on_end:
-    - lottie_state_machine.set_state:
-        id: robot_sm
-        state: idle
+# IMPORTANT : ne PAS créer de nouveaux sensors/text_sensors ici !
+# Ajoutez les actions lottie_state_machine.set_state dans vos
+# sensors EXISTANTS. Exemple avec le sensor notification déjà présent :
+#
+#   - platform: homeassistant
+#     id: notification_text            # ← celui qui EXISTE DÉJÀ
+#     entity_id: ${notifications}
+#     internal: true
+#     on_value:
+#       then:
+#         # ... vos actions existantes (label update, lambda, etc.) ...
+#
+#         # Ajouter à la fin du bloc if/else existant :
+#         - if:
+#             condition:
+#               lambda: 'return id(notification);'
+#             then:
+#               - lvgl.widget.show: alert_icon
+#               - lottie_state_machine.set_state:
+#                   id: robot_sm
+#                   state: alert
+#             else:
+#               - lvgl.widget.hide: alert_icon
+#               - lottie_state_machine.set_state:
+#                   id: robot_sm
+#                   state: idle
+#
+# Pareil pour le voice assistant (ajoutez dans celui qui existe) :
+#
+#   voice_assistant:
+#     on_wake_word_detected:
+#       - lottie_state_machine.set_state:
+#           id: robot_sm
+#           state: active
+#       - lvgl.page.show: page_assistant
+#     on_end:
+#       - lottie_state_machine.set_state:
+#           id: robot_sm
+#           state: idle
+#       - lvgl.page.show: page_home
 
 # --- 5. Contrôle depuis Home Assistant ---
 #
