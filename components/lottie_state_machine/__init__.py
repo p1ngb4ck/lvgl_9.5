@@ -119,6 +119,7 @@ async def to_code(config):
     # Play/Pause Switch
     play_sw = cg.new_Pvariable(config[CONF_PLAY_SWITCH])
     await switch.register_switch(play_sw, {
+        "id": config[CONF_PLAY_SWITCH],
         "name": f"{name} Play",
         "icon": "mdi:play-pause",
     })
@@ -129,6 +130,7 @@ async def to_code(config):
     if state_names:
         state_sel = cg.new_Pvariable(config[CONF_STATE_SELECT])
         await select.register_select(state_sel, {
+            "id": config[CONF_STATE_SELECT],
             "name": f"{name} State",
             "icon": "mdi:state-machine",
             "options": state_names,
@@ -139,6 +141,7 @@ async def to_code(config):
     # Speed Number
     speed_num = cg.new_Pvariable(config[CONF_SPEED_NUMBER])
     await number.register_number(speed_num, {
+        "id": config[CONF_SPEED_NUMBER],
         "name": f"{name} Speed",
         "icon": "mdi:speedometer",
         "min_value": 0.1,
@@ -152,6 +155,7 @@ async def to_code(config):
     # Frame Number
     frame_num = cg.new_Pvariable(config[CONF_FRAME_NUMBER])
     await number.register_number(frame_num, {
+        "id": config[CONF_FRAME_NUMBER],
         "name": f"{name} Frame",
         "icon": "mdi:filmstrip",
         "min_value": 0,
@@ -165,6 +169,7 @@ async def to_code(config):
     # Frame Sensor
     frame_sens = cg.new_Pvariable(config[CONF_FRAME_SENSOR])
     await sensor.register_sensor(frame_sens, {
+        "id": config[CONF_FRAME_SENSOR],
         "name": f"{name} Current Frame",
         "icon": "mdi:animation-play",
         "accuracy_decimals": 0,
