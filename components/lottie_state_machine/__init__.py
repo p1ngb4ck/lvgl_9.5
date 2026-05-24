@@ -77,6 +77,11 @@ async def to_code(config):
     for sn in state_names:
         cg.add(var.add_state_name(sn))
 
+    # Connect to the Lottie LVGL widget object
+    # The lottie_id maps to a lv_obj_t* C++ variable created by the LVGL component
+    lottie_id = config[CONF_LOTTIE_ID]
+    cg.add(var.set_lottie_obj(cg.RawExpression(lottie_id)))
+
 
 @automation.register_action(
     "lottie_state_machine.set_state",

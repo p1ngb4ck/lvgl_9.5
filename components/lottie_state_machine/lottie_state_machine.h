@@ -47,6 +47,19 @@ class LottieStateMachineComponent : public Component {
   float get_setup_priority() const override { return setup_priority::LATE; }
 
   void setup() override {
+#if LV_USE_LOTTIE
+    if (this->lottie_obj_ != nullptr && this->ctx_ == nullptr) {
+      this->ctx_ = (lvgl::LottieContext *)lv_obj_get_user_data(this->lottie_obj_);
+      if (this->ctx_ != nullptr) {
+        ESP_LOGI(TAG, "'%s' connected to Lottie widget", this->name_.c_str());
+        if (!this->initial_state_.empty()) {
+          this->set_state(this->initial_state_);
+        }
+      } else {
+        ESP_LOGW(TAG, "'%s' Lottie widget has no context yet", this->name_.c_str());
+      }
+    }
+#endif
     ESP_LOGI(TAG, "Lottie State Machine '%s' initialized with %d states",
              this->name_.c_str(), (int)this->states_.size());
     for (auto &pair : this->states_) {
@@ -55,6 +68,23 @@ class LottieStateMachineComponent : public Component {
                (int)pair.second.end_frame, (int)pair.second.loop);
     }
   }
+
+  void loop() override {
+#if LV_USE_LOTTIE
+    // Retry connection if not yet established (Lottie loads async)
+    if (this->lottie_obj_ != nullptr && this->ctx_ == nullptr) {
+      this->ctx_ = (lvgl::LottieContext *)lv_obj_get_user_data(this->lottie_obj_);
+      if (this->ctx_ != nullptr) {
+        ESP_LOGI(TAG, "'%s' connected to Lottie widget (deferred)", this->name_.c_str());
+        if (!this->initial_state_.empty()) {
+          this->set_state(this->initial_state_);
+        }
+      }
+    }
+#endif
+  }
+
+  void set_lottie_obj(lv_obj_t *obj) { this->lottie_obj_ = obj; }
 
   // --- Public API ---
 
@@ -136,6 +166,7 @@ class LottieStateMachineComponent : public Component {
   std::map<std::string, StateDefinition> states_;
   std::vector<std::string> state_names_;
 
+  lv_obj_t *lottie_obj_{nullptr};
 #if LV_USE_LOTTIE
   lvgl::LottieContext *ctx_{nullptr};
 #endif
