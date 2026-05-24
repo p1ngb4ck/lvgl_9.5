@@ -135,10 +135,9 @@ inline void lottie_load_task(void *param) {
     }
 
     // --- Frame render loop with state machine ---
-    int32_t total_frames = ctx->end_frame - ctx->start_frame;
-    uint32_t frame_delay_ms = ctx->duration_ms / (uint32_t)total_frames;
-    if (frame_delay_ms < 16)  frame_delay_ms = 16;
-    if (frame_delay_ms > 100) frame_delay_ms = 100;
+    // Note: total_frames and segment_duration are recalculated inside the loop
+    // because set_state() can change start_frame/end_frame at any time.
+    uint32_t frame_delay_ms = 16;  // ~60fps default
 
     ESP_LOGI(LOTTIE_TAG, "Render loop: %u ms/frame, loop=%d, state=%s",
              (unsigned)frame_delay_ms, (int)ctx->loop,
@@ -157,18 +156,24 @@ inline void lottie_load_task(void *param) {
                     ctx->start_tick = xTaskGetTickCount();
                     ctx->pause_elapsed_ms = 0;
                     ctx->restart_requested = false;
-                    ESP_LOGI(LOTTIE_TAG, "Animation restarted from frame 0");
+                    ESP_LOGI(LOTTIE_TAG, "Segment [%d-%d] loop=%d",
+                             (int)ctx->start_frame, (int)ctx->end_frame, (int)ctx->loop);
                 }
+
+                // Recalculate segment params each frame (set_state can change them)
+                int32_t total_frames = ctx->end_frame - ctx->start_frame;
+                if (total_frames <= 0) total_frames = 1;
+                uint32_t segment_duration_ms = (uint32_t)total_frames * 1000 / 60;  // 60fps
 
                 uint32_t elapsed_ms = ctx->pause_elapsed_ms +
                     (uint32_t)((xTaskGetTickCount() - ctx->start_tick) * portTICK_PERIOD_MS);
 
                 int32_t frame;
                 if (ctx->loop) {
-                    uint32_t phase = elapsed_ms % ctx->duration_ms;
-                    frame = ctx->start_frame + (int32_t)((int64_t)total_frames * phase / ctx->duration_ms);
+                    uint32_t phase = elapsed_ms % segment_duration_ms;
+                    frame = ctx->start_frame + (int32_t)((int64_t)total_frames * phase / segment_duration_ms);
                 } else {
-                    if (elapsed_ms >= ctx->duration_ms) {
+                    if (elapsed_ms >= segment_duration_ms) {
                         lv_lock();
                         ctx->exec_cb(ctx->anim_var, ctx->end_frame);
                         lv_unlock();
@@ -176,7 +181,7 @@ inline void lottie_load_task(void *param) {
                         ESP_LOGI(LOTTIE_TAG, "Animation complete → STOPPED");
                         continue;
                     }
-                    frame = ctx->start_frame + (int32_t)((int64_t)total_frames * elapsed_ms / ctx->duration_ms);
+                    frame = ctx->start_frame + (int32_t)((int64_t)total_frames * elapsed_ms / segment_duration_ms);
                 }
 
                 lv_lock();
