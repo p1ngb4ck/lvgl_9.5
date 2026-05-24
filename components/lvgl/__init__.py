@@ -514,7 +514,9 @@ async def to_code(configs):
 
     # lv_theme_default.c references lv_buttonmatrix_class and lv_button_class
     # unconditionally, so they must always be compiled even if not used in the YAML.
-    _THEME_REQUIRED_WIDGETS = {"BTNMATRIX", "BUTTON"}
+    # CANVAS is required because lv_lottie.h (included by lvgl.h) checks for it
+    # via #error even when LV_USE_LOTTIE=0.
+    _THEME_REQUIRED_WIDGETS = {"BTNMATRIX", "BUTTON", "CANVAS"}
     _used_canonical |= _THEME_REQUIRED_WIDGETS
     # Also add to lv_uses so the build filter includes the source files
     for w in _THEME_REQUIRED_WIDGETS:
@@ -555,9 +557,6 @@ async def to_code(configs):
         df.add_define("LV_USE_THORVG_INTERNAL", "0")
         df.add_define("LV_USE_SVG", "0")
         df.add_define("LV_USE_LOTTIE", "0")
-        # lv_lottie.h checks LV_USE_CANVAS even when LV_USE_LOTTIE=0
-        # because lvgl.h includes all widget headers unconditionally.
-        df.add_define("LV_USE_CANVAS", "1")
         # Smaller stack when ThorVG is not used
         df.add_define("LV_DRAW_THREAD_STACK_SIZE", "(8 * 1024)")
         df.LOGGER.info(
