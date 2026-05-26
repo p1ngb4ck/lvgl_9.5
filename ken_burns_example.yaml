@@ -100,6 +100,8 @@ image:
   - file: "lvgl_rgb888_demo.png"
     id: img_landscape
     type: RGB565          # PPA SRM supports RGB565 natively
+    resize: 1400x820      # Upscale source : 1024×600 → 1400×820 pour avoir de la marge pan+zoom
+                          # (ratio ~1024:600 conservé ; légère interpolation à la compilation)
 
 # --- Global state ---
 globals:
@@ -160,8 +162,8 @@ interval:
 
           // Phase 0: zoom in, pan upper-left → center
           // Phase 1: zoom out, pan center → lower-right (reversed)
-          const int px0 = 180, py0 = 130;   // start pivot (upper-left region, img 1280×800)
-          const int px1 = 1100, py1 = 670;  // end pivot (lower-right region)
+          const int px0 = 180, py0 = 120;   // start pivot : haut-gauche (image 1400×820)
+          const int px1 = 1220, py1 = 700;  // end pivot   : bas-droite
 
           if(phase == 0) {
               scale_val = (int)(zoom_a + (zoom_b - zoom_a) * t);
@@ -232,10 +234,10 @@ lvgl:
                   id: lv_kb_image
                   src: img_landscape
                   align: CENTER
-                  # Initial state: no zoom, pivot at image center (1280/2, 800/2)
+                  # Initial state: no zoom, pivot au centre de l'image 1400×820
                   scale: 1.0          # 1.0 = 100% ; lambdas utilisent lv_image_set_scale() en entiers LVGL
-                  pivot_x: 640        # center of 1280-wide image
-                  pivot_y: 400        # center of 800-tall image
+                  pivot_x: 700        # centre de 1400px
+                  pivot_y: 410        # centre de 820px
 
         # HUD overlay (drawn on top of the Ken Burns layer)
         - obj:
