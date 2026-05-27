@@ -21,9 +21,11 @@ substitutions:
 
   # Ken Burns animation parameters
   ken_burns_image: "NCC4.jpg"
-  anim_duration_ms: "8000"   # Duration of one zoom+pan phase (ms)
+  anim_duration_ms: "20000"  # Duration of one zoom+pan phase (ms)
   zoom_start: "256"          # LV_SCALE_NONE = 1.0x
-  zoom_end:   "358"          # ~1.4x (256 * 1.4 = 358)
+  zoom_end:   "320"          # ~1.25x (256 * 1.25 = 320)
+  pan_range_x: "200"         # pixels to pan on X axis
+  pan_range_y: "90"          # pixels to pan on Y axis
   
   power_icon:        "\U0000e909"
   play_icon:         "\U0000e90a"
@@ -1764,7 +1766,7 @@ globals:
   - id: kb_ticks_total
     type: int
     restore_value: no
-    initial_value: "242"    # 8000 ms / 33 ms ≈ 242
+    initial_value: "606"    # 20000 ms / 33 ms ≈ 606
 
   # FPS counters
   - id: kb_fps_count
@@ -4836,8 +4838,8 @@ lvgl:
                     src: space
                     align: CENTER
                     scale: 1.0
-                    pivot_x: 520        # = px0
-                    pivot_y: 305        # = py0
+                    pivot_x: 540        # cx - pan_range_x/2
+                    pivot_y: 315        # cy - pan_range_y/2
   
           # HUD overlay (drawn on top of the Ken Burns layer)
           - obj:
@@ -7021,21 +7023,19 @@ interval:
           // Ease-in-out: smoothstep(t) = 3t² - 2t³
           float t = t_lin * t_lin * (3.0f - 2.0f * t_lin);
 
-          // Zoom: interpolate between LV_SCALE_NONE (256) and zoom_end (358)
           const int zoom_a = ${zoom_start};
           const int zoom_b = ${zoom_end};
           int scale_val;
-
-          // Pivot (zoom center) within the image, interpolated for panning
           int pivot_x, pivot_y;
 
-          // Phase 0: zoom in, pan upper-left → center
-          // Phase 1: zoom out, pan center → lower-right (reversed)
-          // Bornes valides pour image 1280×720 sur écran 1024×600 :
-          //   s=1.00 → px∈[512,768] py∈[300,420]
-          //   s=1.40 → px∈[366,914] py∈[215,505]
-          const int px0 = 520, py0 = 305;   // start pivot : haut-gauche (s=1.0)
-          const int px1 = 900, py1 = 500;   // end pivot   : bas-droite  (s=1.4)
+          // Image center (1280×720) ± pan range from substitutions
+          const int cx = 640, cy = 360;
+          const int pan_x = ${pan_range_x};
+          const int pan_y = ${pan_range_y};
+          const int px0 = cx - pan_x / 2;   // 540
+          const int py0 = cy - pan_y / 2;   // 315
+          const int px1 = cx + pan_x / 2;   // 740
+          const int py1 = cy + pan_y / 2;   // 405
 
           if(phase == 0) {
               scale_val = (int)(zoom_a + (zoom_b - zoom_a) * t);
