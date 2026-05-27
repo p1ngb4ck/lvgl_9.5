@@ -4834,8 +4834,12 @@ lvgl:
                 lv_obj_clear_flag(id(lv_kb_image),     LV_OBJ_FLAG_SCROLLABLE);
                 lv_obj_clear_flag(id(lv_kb_image),     LV_OBJ_FLAG_CLICKABLE);
                 lv_obj_set_scroll_dir(id(lv_kb_container), LV_DIR_NONE);
+                // TOP_LEFT alignment so lv_obj_set_pos() is absolute in the container
+                // (align:CENTER in YAML stores a style that re-centers after every scale change)
+                lv_obj_set_align(id(lv_kb_image), LV_ALIGN_TOP_LEFT);
                 lv_image_set_pivot(id(lv_kb_image), 0, 0);
-                lv_obj_set_pos(id(lv_kb_image), (1024 - 1280) / 2, (600 - 720) / 2);
+                lv_image_set_scale(id(lv_kb_image), 256);
+                lv_obj_set_pos(id(lv_kb_image), -128, -60);
         widgets:
           - obj:
               id: lv_kb_container
@@ -4858,7 +4862,6 @@ lvgl:
                 - image:
                     id: lv_kb_image
                     src: space
-                    align: CENTER
                     clickable: false
   
           # HUD overlay (drawn on top of the Ken Burns layer)
