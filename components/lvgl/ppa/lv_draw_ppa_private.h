@@ -31,7 +31,6 @@
 #include "hal/color_hal.h"
 #include "esp_cache.h"
 #include "esp_log.h"
-#include "esp_memory_utils.h"
 
 /*********************
 *      DEFINES
@@ -47,15 +46,11 @@
 *      TYPEDEFS
 **********************/
 
+/** Round size up to cache-line boundary (required by PPA DMA and esp_cache_msync). */
 static inline uint32_t lv_draw_ppa_align_size(uint32_t size)
 {
     return (size + PPA_CACHE_LINE_SIZE - 1U)
            & ~(PPA_CACHE_LINE_SIZE - 1U);
-}
-
-static inline bool lv_draw_ppa_buf_cache_aligned(const void * p)
-{
-    return ((uintptr_t)p % PPA_CACHE_LINE_SIZE) == 0;
 }
 
 typedef struct lv_draw_ppa_unit {

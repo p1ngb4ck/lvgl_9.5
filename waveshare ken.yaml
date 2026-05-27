@@ -4811,6 +4811,15 @@ lvgl:
         bg_color: 0x000000
         on_load:
           then:
+            - lambda: |-
+                /* Force-disable scroll/click on container and image via LVGL API.
+                 * YAML scrollable:false sets the flag but scroll propagation to the
+                 * page itself can bypass it — clear flags here to be sure. */
+                lv_obj_clear_flag(id(lv_kb_container), LV_OBJ_FLAG_SCROLLABLE);
+                lv_obj_clear_flag(id(lv_kb_container), LV_OBJ_FLAG_CLICKABLE);
+                lv_obj_clear_flag(id(lv_kb_image),     LV_OBJ_FLAG_SCROLLABLE);
+                lv_obj_clear_flag(id(lv_kb_image),     LV_OBJ_FLAG_CLICKABLE);
+                lv_obj_set_scroll_dir(id(lv_kb_container), LV_DIR_NONE);
             - lvgl.image.update:
                 id: lv_kb_image
                 src: space
@@ -4827,7 +4836,7 @@ lvgl:
               clip_corner: true
               overflow_visible: false
               scrollable: false
-              scroll_dir: NONE
+              clickable: false
   
               widgets:
                 # Ken Burns image widget (source: 1280×720)
@@ -4840,6 +4849,7 @@ lvgl:
                     scale: 1.0
                     pivot_x: 540        # cx - pan_range_x/2
                     pivot_y: 315        # cy - pan_range_y/2
+                    clickable: false
   
           # HUD overlay (drawn on top of the Ken Burns layer)
           - obj:
