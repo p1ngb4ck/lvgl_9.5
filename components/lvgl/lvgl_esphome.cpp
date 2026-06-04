@@ -596,11 +596,27 @@ void LvglComponent::flush_task_entry_(void *arg) { static_cast<LvglComponent *>(
 void LvglComponent::flush_task_loop_() {
   auto queue = static_cast<QueueHandle_t>(this->flush_queue_);
   FlushJob job;
+  uint64_t acc_us = 0;
+  uint32_t acc_cnt = 0;
+  uint64_t last_log = 0;
   for (;;) {
     if (xQueueReceive(queue, &job, portMAX_DELAY) == pdTRUE) {
+      uint64_t t0 = esp_timer_get_time();
       this->draw_buffer_(&job.area, reinterpret_cast<lv_color_data *>(job.buf));
       // Signal LVGL that this buffer is free; it can now flush the other one.
       lv_display_flush_ready(this->disp_);
+      // Report the FULL flush time (rotate + panel push). Compare with the
+      // "PPA rotate" line: the difference is the draw_pixels_at push cost.
+      acc_us += esp_timer_get_time() - t0;
+      acc_cnt++;
+      uint64_t now = esp_timer_get_time();
+      if (now - last_log >= 1000000ULL && acc_cnt > 0) {
+        ESP_LOGI(TAG, "Flush total (rotate+push): avg %.2f ms/op over %u ops",
+                 (double) acc_us / acc_cnt / 1000.0, acc_cnt);
+        acc_us = 0;
+        acc_cnt = 0;
+        last_log = now;
+      }
     }
   }
 }
