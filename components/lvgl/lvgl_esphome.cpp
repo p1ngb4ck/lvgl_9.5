@@ -138,12 +138,34 @@ static bool ppa_rotate_display_buf(const void *src, void *dst, int32_t w, int32_
   cfg.alpha_update_mode = PPA_ALPHA_NO_CHANGE;
   cfg.mode = PPA_TRANS_MODE_BLOCKING;
 
+  uint64_t t0 = esp_timer_get_time();
   esp_err_t ret = ppa_do_scale_rotate_mirror(s_display_srm_client, &cfg);
+  uint64_t dt = esp_timer_get_time() - t0;
   if (ret != ESP_OK) {
     static bool warned = false;
     if (!warned) {
       ESP_LOGW(TAG, "PPA display rotation unavailable (err=%d), using SW fallback", ret);
       warned = true;
+    }
+  } else {
+    // Report the real PPA hardware rotation time, averaged, once per ~second.
+    // This tells us whether the 17ms/frame penalty is the PPA op itself
+    // (PSRAM-bound) or overhead elsewhere in the flush path.
+    static uint64_t acc_us = 0;
+    static uint32_t acc_cnt = 0;
+    static uint64_t acc_px = 0;
+    static uint64_t last_log = 0;
+    acc_us += dt;
+    acc_cnt++;
+    acc_px += (uint64_t) w * h;
+    uint64_t now = esp_timer_get_time();
+    if (now - last_log >= 1000000ULL && acc_cnt > 0) {
+      ESP_LOGI(TAG, "PPA rotate: avg %.2f ms/op over %u ops (%.0f Kpx/op), HW active",
+               (double) acc_us / acc_cnt / 1000.0, acc_cnt, (double) acc_px / acc_cnt / 1000.0);
+      acc_us = 0;
+      acc_cnt = 0;
+      acc_px = 0;
+      last_log = now;
     }
   }
   return ret == ESP_OK;
