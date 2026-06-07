@@ -10,10 +10,10 @@
 #include "driver/ppa.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
-#include "esp_memory_utils.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 extern "C" {
 void lv_draw_ppa_init(void);
 void lvgl_port_ppa_v9_init(lv_display_t *display);
@@ -90,16 +90,10 @@ static bool ppa_rotate_display_buf(const void *src, void *dst, int32_t w, int32_
   // CONFIG_CACHE_L2_CACHE_LINE_128B=y. Use the larger value so the check
   // passes under both sdkconfigs.
   constexpr uintptr_t CACHE_LINE = 128;
-  if ((reinterpret_cast<uintptr_t>(src) & (CACHE_LINE - 1)) != 0 ||
-      (reinterpret_cast<uintptr_t>(dst) & (CACHE_LINE - 1)) != 0) {
-    static bool align_warned = false;
-    if (!align_warned) {
-      ESP_LOGW(TAG, "PPA rotation skipped: buffer not 128B-aligned (src=%p dst=%p) -> SW fallback",
-               src, dst);
-      align_warned = true;
-    }
+  if ((reinterpret_cast<uintptr_t>(src) & (CACHE_LINE - 1)) != 0)
     return false;
-  }
+  if ((reinterpret_cast<uintptr_t>(dst) & (CACHE_LINE - 1)) != 0)
+    return false;
 
   ppa_srm_rotation_angle_t ppa_angle;
   int32_t out_w, out_h;
@@ -152,34 +146,12 @@ static bool ppa_rotate_display_buf(const void *src, void *dst, int32_t w, int32_
   cfg.alpha_update_mode = PPA_ALPHA_NO_CHANGE;
   cfg.mode = PPA_TRANS_MODE_BLOCKING;
 
-  uint64_t t0 = esp_timer_get_time();
   esp_err_t ret = ppa_do_scale_rotate_mirror(s_display_srm_client, &cfg);
-  uint64_t dt = esp_timer_get_time() - t0;
   if (ret != ESP_OK) {
     static bool warned = false;
     if (!warned) {
       ESP_LOGW(TAG, "PPA display rotation unavailable (err=%d), using SW fallback", ret);
       warned = true;
-    }
-  } else {
-    // Report the real PPA hardware rotation time, averaged, once per ~second.
-    // This tells us whether the 17ms/frame penalty is the PPA op itself
-    // (PSRAM-bound) or overhead elsewhere in the flush path.
-    static uint64_t acc_us = 0;
-    static uint32_t acc_cnt = 0;
-    static uint64_t acc_px = 0;
-    static uint64_t last_log = 0;
-    acc_us += dt;
-    acc_cnt++;
-    acc_px += (uint64_t) w * h;
-    uint64_t now = esp_timer_get_time();
-    if (now - last_log >= 1000000ULL && acc_cnt > 0) {
-      ESP_LOGI(TAG, "PPA rotate: avg %.2f ms/op over %u ops (%.0f Kpx/op), HW active",
-               (double) acc_us / acc_cnt / 1000.0, acc_cnt, (double) acc_px / acc_cnt / 1000.0);
-      acc_us = 0;
-      acc_cnt = 0;
-      acc_px = 0;
-      last_log = now;
     }
   }
   return ret == ESP_OK;
@@ -420,13 +392,6 @@ void LvglComponent::draw_buffer_(const lv_area_t *area, lv_color_data *ptr) {
   // Falls back to software automatically if PPA rejects the operation.
   if (s_display_srm_client != nullptr && this->rotation != display::DISPLAY_ROTATION_0_DEGREES) {
     if (ppa_rotate_display_buf(ptr, this->rotate_buf_, width, height, this->rotation)) {
-      // One-time confirmation that the rotation runs on PPA hardware (≈0 CPU).
-      // This is the path that keeps FPS high while the camera streams.
-      static bool hw_logged = false;
-      if (!hw_logged) {
-        ESP_LOGI(TAG, "Display rotation: PPA HARDWARE active (CPU offloaded)");
-        hw_logged = true;
-      }
       // dst already points to rotate_buf_ (initialized above)
       // Coordinate update: identical geometry to the software path
       switch (this->rotation) {
@@ -455,14 +420,7 @@ void LvglComponent::draw_buffer_(const lv_area_t *area, lv_color_data *ptr) {
       }
       return;
     }
-    // PPA refused this op → fall through to (slow) software rotation below.
-    // Warn once: this is the case that eats CPU and costs FPS with the camera.
-    static bool sw_warned = false;
-    if (!sw_warned) {
-      ESP_LOGW(TAG, "Display rotation: falling back to CPU software loops "
-                    "(PPA refused the op). FPS will drop. See earlier PPA logs for the reason.");
-      sw_warned = true;
-    }
+    // PPA refused this op → fall through to software rotation below.
   }
 #endif  // USE_LVGL_PPA
 
@@ -595,30 +553,30 @@ void LvglComponent::flush_task_entry_(void *arg) { static_cast<LvglComponent *>(
 
 void LvglComponent::flush_task_loop_() {
   auto queue = static_cast<QueueHandle_t>(this->flush_queue_);
+  auto done = static_cast<SemaphoreHandle_t>(this->flush_done_sem_);
   FlushJob job;
-  uint64_t acc_us = 0;
-  uint32_t acc_cnt = 0;
-  uint64_t last_log = 0;
   for (;;) {
     if (xQueueReceive(queue, &job, portMAX_DELAY) == pdTRUE) {
-      uint64_t t0 = esp_timer_get_time();
+      // Heavy work only: rotate (PPA) + panel push. This task NEVER calls any
+      // LVGL function — that would race with lv_timer_handler on the main loop
+      // (the previous version crashed with a Core 1 panic). Instead we signal
+      // completion and let loop() call lv_display_flush_ready on the main thread.
       this->draw_buffer_(&job.area, reinterpret_cast<lv_color_data *>(job.buf));
-      // Signal LVGL that this buffer is free; it can now flush the other one.
-      lv_display_flush_ready(this->disp_);
-      // Report the FULL flush time (rotate + panel push). Compare with the
-      // "PPA rotate" line: the difference is the draw_pixels_at push cost.
-      acc_us += esp_timer_get_time() - t0;
-      acc_cnt++;
-      uint64_t now = esp_timer_get_time();
-      if (now - last_log >= 1000000ULL && acc_cnt > 0) {
-        ESP_LOGI(TAG, "Flush total (rotate+push): avg %.2f ms/op over %u ops",
-                 (double) acc_us / acc_cnt / 1000.0, acc_cnt);
-        acc_us = 0;
-        acc_cnt = 0;
-        last_log = now;
-      }
+      xSemaphoreGive(done);
     }
   }
+}
+
+// Called by LVGL (on the main thread) when it must wait for an outstanding
+// flush to finish before reusing a draw buffer. We block on the flush task's
+// completion semaphore and then mark the flush ready — all on the main thread,
+// so lv_display_flush_ready is never called concurrently with lv_timer_handler.
+void LvglComponent::flush_wait_cb_(lv_display_t *disp) {
+  auto *self = static_cast<LvglComponent *>(lv_display_get_user_data(disp));
+  if (self == nullptr || self->flush_done_sem_ == nullptr)
+    return;
+  if (xSemaphoreTake(static_cast<SemaphoreHandle_t>(self->flush_done_sem_), portMAX_DELAY) == pdTRUE)
+    lv_display_flush_ready(disp);
 }
 #endif
 
@@ -971,14 +929,6 @@ void LvglComponent::setup() {
     return;
   }
   this->draw_buf_ = static_cast<uint8_t *>(buffer);
-#ifdef USE_LVGL_PPA
-  // Report where the draw buffer landed. Internal SRAM has ~10x the bandwidth
-  // of PSRAM and is not contended by the camera/DSI DMA, so a draw/rotate
-  // buffer in internal SRAM makes the PPA rotation dramatically faster. If it
-  // landed in PSRAM, reduce buffer_size: so it fits internal SRAM.
-  ESP_LOGI(TAG, "Draw buffer: %zu bytes @ %p (%s)", buf_bytes, this->draw_buf_,
-           esp_ptr_internal(this->draw_buf_) ? "INTERNAL SRAM" : "PSRAM (slow for rotation)");
-#endif
   lv_display_set_resolution(this->disp_, this->width_, this->height_);
 #if LV_COLOR_DEPTH == 32
   // RGB888: 3 bytes per pixel, fully supported by PPA as destination
@@ -1006,30 +956,36 @@ void LvglComponent::setup() {
       return;
     }
 #ifdef USE_LVGL_PPA
-    ESP_LOGI(TAG, "Rotate buffer: %zu bytes @ %p (%s)", buf_bytes, this->rotate_buf_,
-             esp_ptr_internal(this->rotate_buf_) ? "INTERNAL SRAM" : "PSRAM (slow for rotation)");
     if (s_display_srm_client != nullptr) {
       ESP_LOGI(TAG, "Display rotation will use PPA SRM hardware acceleration");
     }
     // Pipeline the rotation+push: second draw buffer (double buffering) + a
-    // dedicated flush task. Lets LVGL render frame N+1 while frame N is being
-    // rotated and pushed — this is what gives esp_lvgl_port its fluid FPS with
-    // rotation. Falls back to the synchronous single-buffer path on any failure.
+    // dedicated flush task. LVGL renders frame N+1 into the other buffer while
+    // the task rotates+pushes frame N. The task does NO LVGL calls; the main
+    // loop / flush_wait_cb_ call lv_display_flush_ready, so there is no thread
+    // race. Falls back to the synchronous single-buffer path on any failure.
     this->draw_buf2_ = static_cast<uint8_t *>(alloc_draw_buf(buf_bytes));
     if (this->draw_buf2_ != nullptr) {
       this->flush_queue_ = xQueueCreate(2, sizeof(FlushJob));
-      if (this->flush_queue_ != nullptr) {
+      this->flush_done_sem_ = xSemaphoreCreateCounting(8, 0);
+      if (this->flush_queue_ != nullptr && this->flush_done_sem_ != nullptr) {
         BaseType_t ok = xTaskCreatePinnedToCore(&LvglComponent::flush_task_entry_, "lvgl_flush", 8192, this,
                                                  5, reinterpret_cast<TaskHandle_t *>(&this->flush_task_), 1);
         if (ok == pdPASS) {
           this->async_flush_ = true;
+          lv_display_set_flush_wait_cb(this->disp_, &LvglComponent::flush_wait_cb_);
           ESP_LOGI(TAG, "Display rotation: pipelined flush enabled (double buffer + flush task)");
-        } else {
-          vQueueDelete(static_cast<QueueHandle_t>(this->flush_queue_));
-          this->flush_queue_ = nullptr;
         }
       }
       if (!this->async_flush_) {
+        if (this->flush_queue_ != nullptr) {
+          vQueueDelete(static_cast<QueueHandle_t>(this->flush_queue_));
+          this->flush_queue_ = nullptr;
+        }
+        if (this->flush_done_sem_ != nullptr) {
+          vSemaphoreDelete(static_cast<SemaphoreHandle_t>(this->flush_done_sem_));
+          this->flush_done_sem_ = nullptr;
+        }
         heap_caps_free(this->draw_buf2_);
         this->draw_buf2_ = nullptr;
         ESP_LOGW(TAG, "Pipelined flush unavailable -> synchronous rotation (lower FPS)");
@@ -1107,6 +1063,16 @@ void LvglComponent::loop() {
     this->loop_started_ = true;
     ESP_LOGD(TAG, "LVGL loop started - system is now fully ready");
   }
+
+#ifdef USE_LVGL_PPA
+  // Complete any async (pipelined) flushes the flush task finished. We call
+  // lv_display_flush_ready here, on the main thread, so it never races with
+  // lv_timer_handler — the flush task only does the rotate+push and signals.
+  if (this->flush_done_sem_ != nullptr) {
+    while (xSemaphoreTake(static_cast<SemaphoreHandle_t>(this->flush_done_sem_), 0) == pdTRUE)
+      lv_display_flush_ready(this->disp_);
+  }
+#endif
 
   if (this->is_paused()) {
     if (this->paused_ && this->show_snow_)

@@ -265,9 +265,11 @@ class LvglComponent : public PollingComponent {
   uint8_t *draw_buf2_{};          // second draw buffer (double buffering)
   void *flush_task_{nullptr};     // TaskHandle_t
   void *flush_queue_{nullptr};    // QueueHandle_t holding a FlushJob
+  void *flush_done_sem_{nullptr}; // SemaphoreHandle_t: flush task -> main loop
   bool async_flush_{false};
   void flush_task_loop_();
   static void flush_task_entry_(void *arg);
+  static void flush_wait_cb_(lv_display_t *disp);
   bool buffers_configured_{false};  // Track if lv_display_set_buffers() has been called
   size_t buf_bytes_{0};              // Store buffer size for delayed configuration
   bool loop_started_{false};  // safe to perform LVGL ops only after loop() starts
