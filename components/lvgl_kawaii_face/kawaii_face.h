@@ -4,7 +4,9 @@
 #include "esphome/core/automation.h"
 #include "esphome/core/log.h"
 
+#include <cctype>
 #include <string>
+#include <vector>
 
 #ifdef USE_LVGL
 // Pulls in <lvgl.h> (for lv_obj_t / lv_lock / lv_unlock) and the kawaii face
@@ -39,11 +41,30 @@ class KawaiiFaceComponent : public Component {
   void set_smooth(bool smooth) { this->smooth_ = smooth; }
   void set_initial_emotion(const std::string &emotion) { this->initial_emotion_ = emotion; }
 
+  // Append a keyword that, when found (case-insensitive) in a response, selects
+  // the given emotion. Rules are evaluated in the order emotions are first
+  // declared; the first matching keyword wins. Configured from YAML; if none
+  // are configured, sensible FR/EN defaults are installed in setup().
+  void add_response_keyword(const std::string &emotion, const std::string &keyword) {
+    std::string kw = to_lower_(keyword);
+    for (auto &rule : this->response_rules_) {
+      if (rule.emotion == emotion) {
+        rule.keywords.push_back(kw);
+        return;
+      }
+    }
+    this->response_rules_.push_back(ResponseRule{emotion, {kw}});
+  }
+  // Emotion used when a response matches no keyword.
+  void set_response_fallback(const std::string &emotion) { this->response_fallback_ = emotion; }
+
   // Run after the lvgl component (PROCESSOR priority) has created its
   // display, screens and widgets.
   float get_setup_priority() const override { return setup_priority::LATE; }
 
   void setup() override {
+    if (this->response_rules_.empty())
+      this->install_default_response_rules_();
 #ifdef USE_LVGL
     // Route the C component's thread-safety hooks through LVGL's own guard.
     // ESPHome drives lv_timer_handler() on the main loop, so these are
@@ -109,7 +130,57 @@ class KawaiiFaceComponent : public Component {
 #endif
   }
 
+  // Pick an emotion from the content of a response (e.g. the voice-assistant
+  // TTS text in on_tts_start). Matches the configured keyword rules, falling
+  // back to `response_fallback_` when nothing matches. This is how the face
+  // "follows" what the LLM actually says.
+  void set_emotion_from_text(const std::string &text) {
+    std::string r = to_lower_(text);
+    for (const auto &rule : this->response_rules_) {
+      for (const auto &kw : rule.keywords) {
+        if (!kw.empty() && r.find(kw) != std::string::npos) {
+          ESP_LOGD(TAG, "Response matched '%s' -> %s", kw.c_str(), rule.emotion.c_str());
+          this->set_emotion(rule.emotion);
+          return;
+        }
+      }
+    }
+    this->set_emotion(this->response_fallback_);
+  }
+
  protected:
+  static std::string to_lower_(const std::string &in) {
+    std::string out = in;
+    for (auto &c : out)
+      c = (char) std::tolower((unsigned char) c);
+    return out;
+  }
+
+  // Default FR/EN keyword rules, evaluated top to bottom. Negative/error cues
+  // are checked first so "désolé, je n'ai pas trouvé…" reads as sad even though
+  // it may also contain neutral words.
+  void install_default_response_rules_() {
+    const struct {
+      const char *emotion;
+      std::vector<const char *> keywords;
+    } DEFAULTS[] = {
+        {"sad", {"désolé", "desole", "erreur", "impossible", "aucun", "échec",
+                 "je n'ai pas", "sorry", "error", "couldn't", "can't", "cannot",
+                 "failed", "unable", "not found", "no result"}},
+        {"love", {"je t'aime", "i love you", "❤"}},
+        {"confused", {"je ne comprends", "pas compris", "pas sûr", "not sure",
+                      "don't understand", "didn't understand"}},
+        {"surprised", {"attention", "alerte", "warning", "wow"}},
+        {"happy", {"bravo", "super", "génial", "parfait", "d'accord", "c'est fait",
+                   "terminé", "voici", "great", "done", "sure", "success",
+                   "turned on", "turned off", "here is", "i've", "i have"}},
+    };
+    for (const auto &d : DEFAULTS)
+      for (const char *kw : d.keywords)
+        this->add_response_keyword(d.emotion, kw);
+    ESP_LOGD(TAG, "Installed default response keyword rules");
+  }
+
 #ifdef USE_LVGL
   void apply_emotion_(const std::string &emotion) {
     face_emotion_t e;
@@ -177,6 +248,13 @@ class KawaiiFaceComponent : public Component {
   std::string pending_emotion_{};
   bool has_pending_{false};
   bool initialized_{false};
+
+  struct ResponseRule {
+    std::string emotion;
+    std::vector<std::string> keywords;
+  };
+  std::vector<ResponseRule> response_rules_{};
+  std::string response_fallback_{"speaking"};
 };
 
 // --- Action: set_emotion ---
@@ -187,6 +265,19 @@ template<typename... Ts> class KawaiiFaceSetEmotionAction : public Action<Ts...>
   TEMPLATABLE_VALUE(std::string, emotion)
 
   void play(const Ts &...x) override { this->parent_->set_emotion(this->emotion_.value(x...)); }
+
+ protected:
+  KawaiiFaceComponent *parent_;
+};
+
+// --- Action: set_emotion_from_text (react to the response content) ---
+template<typename... Ts> class KawaiiFaceSetEmotionFromTextAction : public Action<Ts...> {
+ public:
+  KawaiiFaceSetEmotionFromTextAction(KawaiiFaceComponent *parent) : parent_(parent) {}
+
+  TEMPLATABLE_VALUE(std::string, text)
+
+  void play(const Ts &...x) override { this->parent_->set_emotion_from_text(this->text_.value(x...)); }
 
  protected:
   KawaiiFaceComponent *parent_;

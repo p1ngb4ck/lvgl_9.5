@@ -8,9 +8,13 @@
 #   wake word détecté   -> excited     (le visage se réveille)
 #   écoute              -> listening   (yeux grands ouverts, attentif)
 #   traitement (STT)    -> thinking    (concentré, réfléchit)
-#   réponse (TTS)       -> speaking    (parle joyeusement)
+#   réponse (TTS)       -> suit le CONTENU de la réponse du LLM (voir on_tts_start)
 #   fin / idle          -> neutral     (au repos)
 #   erreur              -> error       (triste)
+#
+# Pour la réponse, l'action set_emotion_from_text analyse le texte prononcé et
+# choisit l'expression (mots-clés -> émotion). Des règles FR/EN par défaut sont
+# intégrées ; personnalisez-les via `response_keywords:` ci-dessous.
 #
 # Les 17 expressions du composant sont utilisables directement :
 #   neutral, happy, worried, sad, surprised, angry, sleepy, wink, love,
@@ -60,6 +64,16 @@ lvgl_kawaii_face:
   blink_interval: 3000ms
   auto_blink: true
   smooth: true
+  # Émotion par défaut si la réponse ne matche aucun mot-clé (par défaut: speaking)
+  response_fallback: speaking
+  # Optionnel : surcharger les règles mots-clés -> émotion (sinon défauts FR/EN).
+  # Évaluées dans l'ordre déclaré, premier mot-clé trouvé gagne (insensible à la casse).
+  # response_keywords:
+  #   sad: ["désolé", "erreur", "je n'ai pas", "impossible", "sorry", "error"]
+  #   happy: ["bravo", "super", "c'est fait", "d'accord", "done", "great"]
+  #   confused: ["je ne comprends", "pas sûr", "not sure"]
+  #   love: ["je t'aime", "i love you"]
+  #   surprised: ["attention", "alerte", "warning"]
 
 # --- 4. Voice Assistant : le visage réagit à chaque phase ---
 # Reprend les triggers standard du composant voice_assistant.
@@ -86,10 +100,11 @@ voice_assistant:
         id: face
         emotion: thinking
 
+  # La face suit le CONTENU de la réponse du LLM : `x` = le texte prononcé.
   on_tts_start:
-    - lvgl_kawaii_face.set_emotion:
+    - lvgl_kawaii_face.set_emotion_from_text:
         id: face
-        emotion: speaking
+        text: !lambda return x;
 
   on_tts_end:
     - lvgl_kawaii_face.set_emotion:

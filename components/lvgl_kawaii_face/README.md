@@ -51,6 +51,8 @@ lvgl_kawaii_face:
 | `auto_blink` | `true` | Enable automatic blinking. |
 | `smooth` | `true` | Smoothly transition between expressions. |
 | `initial_emotion` | `neutral` | Expression shown at boot. |
+| `response_keywords` | *(FR/EN defaults)* | Map of `emotion: [keywords]` used by `set_emotion_from_text` to pick an expression from a response's text. |
+| `response_fallback` | `speaking` | Expression used when a response matches no keyword. |
 
 > The C component is a singleton — configure a single `lvgl_kawaii_face:` block.
 
@@ -71,6 +73,39 @@ lvgl_kawaii_face:
 Voice-assistant friendly aliases: `idle`→neutral, `listening`→surprised,
 `thinking`→working_hard, `speaking`/`talking`→happy, `error`→sad.
 
+## Action: `lvgl_kawaii_face.set_emotion_from_text`
+
+Makes the face **follow the content of the assistant's (LLM) response**: it
+scans the text for keywords and applies the matching expression (first match
+wins, case-insensitive), or `response_fallback` when nothing matches.
+
+```yaml
+voice_assistant:
+  on_tts_start:                      # x = the response text being spoken
+    - lvgl_kawaii_face.set_emotion_from_text:
+        id: face
+        text: !lambda return x;
+```
+
+Built-in defaults cover common FR/EN cues (errors→sad, praise→happy,
+questions/uncertainty→confused, "je t'aime"→love, warnings→surprised).
+Override them per emotion:
+
+```yaml
+lvgl_kawaii_face:
+  id: face
+  response_fallback: speaking
+  response_keywords:
+    sad: ["désolé", "erreur", "je n'ai pas", "sorry", "error"]
+    happy: ["bravo", "super", "c'est fait", "done", "great"]
+    confused: ["je ne comprends", "not sure"]
+    love: ["je t'aime", "i love you"]
+```
+
+> Tip: for the most precise behaviour, prompt your LLM/agent to phrase replies
+> with clear emotional cues, or have Home Assistant decide the emotion and call
+> `set_emotion` directly.
+
 ## Voice assistant
 
 Wire the actions into the standard `voice_assistant:` triggers — see
@@ -84,8 +119,8 @@ voice_assistant:
     - lvgl_kawaii_face.set_emotion: { id: face, emotion: listening }
   on_stt_end:
     - lvgl_kawaii_face.set_emotion: { id: face, emotion: thinking }
-  on_tts_start:
-    - lvgl_kawaii_face.set_emotion: { id: face, emotion: speaking }
+  on_tts_start:                                  # follow the response content
+    - lvgl_kawaii_face.set_emotion_from_text: { id: face, text: !lambda 'return x;' }
   on_error:
     - lvgl_kawaii_face.set_emotion: { id: face, emotion: error }
   on_end:

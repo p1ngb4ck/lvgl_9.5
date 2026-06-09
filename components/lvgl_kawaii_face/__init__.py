@@ -22,6 +22,9 @@ CONF_AUTO_BLINK = "auto_blink"
 CONF_SMOOTH = "smooth"
 CONF_INITIAL_EMOTION = "initial_emotion"
 CONF_EMOTION = "emotion"
+CONF_TEXT = "text"
+CONF_RESPONSE_KEYWORDS = "response_keywords"
+CONF_RESPONSE_FALLBACK = "response_fallback"
 
 # Expression names recognised by the C component, plus voice-assistant aliases
 # handled by the C++ wrapper (kawaii_face.h). Used to validate static values.
@@ -58,6 +61,9 @@ KawaiiFaceComponent = kawaii_ns.class_("KawaiiFaceComponent", cg.Component)
 KawaiiFaceSetEmotionAction = kawaii_ns.class_(
     "KawaiiFaceSetEmotionAction", automation.Action
 )
+KawaiiFaceSetEmotionFromTextAction = kawaii_ns.class_(
+    "KawaiiFaceSetEmotionFromTextAction", automation.Action
+)
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -75,6 +81,15 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_INITIAL_EMOTION, default="neutral"): cv.one_of(
             *EMOTIONS, lower=True
         ),
+        # Map an emotion to the keywords that select it when found in a response
+        # (case-insensitive substring). Omit to use built-in FR/EN defaults.
+        cv.Optional(CONF_RESPONSE_KEYWORDS): cv.Schema(
+            {cv.one_of(*EMOTIONS, lower=True): cv.ensure_list(cv.string_strict)}
+        ),
+        # Emotion used when a response matches none of the keywords.
+        cv.Optional(CONF_RESPONSE_FALLBACK, default="speaking"): cv.one_of(
+            *EMOTIONS, lower=True
+        ),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -82,6 +97,13 @@ SET_EMOTION_SCHEMA = cv.Schema(
     {
         cv.Required(CONF_ID): cv.use_id(KawaiiFaceComponent),
         cv.Required(CONF_EMOTION): cv.templatable(cv.string),
+    }
+)
+
+SET_EMOTION_FROM_TEXT_SCHEMA = cv.Schema(
+    {
+        cv.Required(CONF_ID): cv.use_id(KawaiiFaceComponent),
+        cv.Required(CONF_TEXT): cv.templatable(cv.string),
     }
 )
 
@@ -101,6 +123,13 @@ async def to_code(config):
     cg.add(var.set_smooth(config[CONF_SMOOTH]))
     cg.add(var.set_initial_emotion(config[CONF_INITIAL_EMOTION]))
 
+    # Response keyword rules (preserve YAML declaration order). When omitted the
+    # C++ side installs built-in FR/EN defaults.
+    for emotion, keywords in config.get(CONF_RESPONSE_KEYWORDS, {}).items():
+        for keyword in keywords:
+            cg.add(var.add_response_keyword(emotion, keyword))
+    cg.add(var.set_response_fallback(config[CONF_RESPONSE_FALLBACK]))
+
 
 @automation.register_action(
     "lvgl_kawaii_face.set_emotion",
@@ -113,4 +142,18 @@ async def kawaii_set_emotion_to_code(config, action_id, template_arg, args):
     var = cg.new_Pvariable(action_id, template_arg, parent)
     templ = await cg.templatable(config[CONF_EMOTION], args, cg.std_string)
     cg.add(var.set_emotion(templ))
+    return var
+
+
+@automation.register_action(
+    "lvgl_kawaii_face.set_emotion_from_text",
+    KawaiiFaceSetEmotionFromTextAction,
+    SET_EMOTION_FROM_TEXT_SCHEMA,
+    synchronous=True,
+)
+async def kawaii_set_emotion_from_text_to_code(config, action_id, template_arg, args):
+    parent = await cg.get_variable(config[CONF_ID])
+    var = cg.new_Pvariable(action_id, template_arg, parent)
+    templ = await cg.templatable(config[CONF_TEXT], args, cg.std_string)
+    cg.add(var.set_text(templ))
     return var
