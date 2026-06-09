@@ -4,6 +4,12 @@ An **ESPHome external component** that draws an animated *kawaii* face on an
 [LVGL 9](https://lvgl.io/) display and lets it **react to your voice
 assistant** (and anything else in ESPHome).
 
+<p align="center">
+  <img src="docs/kawaii_face_demo.gif" width="300" alt="Animated kawaii face cycling through neutral, happy, surprised, love, wink, sad, angry and cool expressions">
+  <br>
+  <sub><em>Illustrative preview (mock-up) — the face moving through several of its expressions.</em></sub>
+</p>
+
 It renders eyes, eyebrows, blush and a mouth on LVGL canvases with per‑emotion
 animations — blinking, bouncing, sparkles, pupil movement, tears, sweat drops —
 and exposes the current expression as ESPHome **actions**, so the face can
