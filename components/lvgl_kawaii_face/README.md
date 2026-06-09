@@ -126,3 +126,24 @@ voice_assistant:
   on_end:
     - lvgl_kawaii_face.set_emotion: { id: face, emotion: neutral }
 ```
+
+## ESP32-P4 / PPA (e.g. Waveshare 7")
+
+Fully compatible with LVGL 9.5 and the PPA-accelerated display path in this
+repo — no special configuration:
+
+- The face renders to **RGB565** canvases, matching the default
+  `color_depth: 16` used on `mipi_dsi` panels.
+- The PPA draw unit evaluates each task and **falls back to software** when a
+  buffer isn't 16-byte aligned (or a rect is rounded / has opacity / a
+  gradient), so the small face canvases never crash; cache coherency is handled
+  by the unit (`esp_cache_msync`). PPA framebuffer rotation is unaffected.
+- Works alongside `use_ppa: true` / `use_ppa_img: true`.
+
+See [`example_esp32p4_waveshare.yaml`](example_esp32p4_waveshare.yaml) for a
+board-specific snippet (1024×600, rotation 180, `okay_nabu`) to merge into your
+existing config.
+
+Canvas buffers (tens of KB) are allocated in internal RAM first, then PSRAM —
+both PPA-accessible. Increase `face_panel` size for a larger face (PSRAM takes
+over).
