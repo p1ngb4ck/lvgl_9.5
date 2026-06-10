@@ -13,7 +13,7 @@ the component is self-contained when fetched via `external_components`.
 
 ```yaml
 external_components:
-  - source: github://youkorr/esphome-lvgl-kawaii-face
+  - source: github://youkorr/esphome-lvgl-kawaii
     components: [lvgl_kawaii_face]
   - source: github://youkorr/lvgl_9.5
     components: [lvgl, image, font]

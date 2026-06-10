@@ -108,7 +108,7 @@ Add the component (and an LVGL build) to `external_components`:
 ```yaml
 external_components:
   # This component
-  - source: github://youkorr/esphome-lvgl-kawaii-face
+  - source: github://youkorr/esphome-lvgl-kawaii
     components: [lvgl_kawaii_face]
 
   # Recommended LVGL build (canvas always on + ESP32‑P4 PPA).

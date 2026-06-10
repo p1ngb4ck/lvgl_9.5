@@ -18,7 +18,7 @@
 # --- 1. Ajoute lvgl_kawaii_face à TA liste de composants externes -----------
 # (tu tires déjà lvgl/image/font de ton dépôt ; ajoute juste lvgl_kawaii_face)
 external_components:
-  - source: github://youkorr/esphome-lvgl-kawaii-face
+  - source: github://youkorr/esphome-lvgl-kawaii
     components: [lvgl_kawaii_face]
   - source: github://youkorr/lvgl_9.5
     components: [lvgl, image, font]

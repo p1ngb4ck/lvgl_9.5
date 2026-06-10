@@ -1,56 +1,52 @@
-# Publier `esphome-lvgl-kawaii-face`
+# Remplir `youkorr/esphome-lvgl-kawaii`
 
-Le dépôt complet et prêt à pousser est dans `dist/esphome-lvgl-kawaii-face/`
-(et une archive `.tar.gz` t'a été envoyée dans le chat).
+Le contenu prêt est dans **`dist/esphome-lvgl-kawaii/`** (et une archive
+`esphome-lvgl-kawaii.tar.gz` t'a été envoyée dans le chat). Le dépôt public
+`youkorr/esphome-lvgl-kawaii` existe déjà (avec un README auto‑généré) — il
+reste juste à y **pousser** ce contenu. `--force` est sûr ici (le dépôt vient
+d'être créé).
 
-> Je n'ai pas pu créer le dépôt GitHub automatiquement : l'intégration GitHub
-> de la session n'a pas la permission de créer des dépôts (`403 Resource not
-> accessible by integration`) et le proxy git est limité à `lvgl_9.5`.
-> Voici donc les étapes manuelles (≈ 1 min).
+## Depuis le téléphone — Codespaces (recommandé)
 
-## Option A — avec le CLI `gh` (le plus rapide)
-
-```bash
-cd dist/esphome-lvgl-kawaii-face
-git init -b main
-git add -A
-git commit -m "Initial commit: ESPHome LVGL Kawaii Face"
-gh repo create youkorr/esphome-lvgl-kawaii-face --public --source=. --remote=origin --push
-```
-
-## Option B — sans `gh` (web + git)
-
-1. Crée le dépôt vide sur GitHub : https://github.com/new
-   - Owner: `youkorr` · Name: `esphome-lvgl-kawaii-face` · Public
-   - **Ne coche pas** « Add a README » (le dépôt en contient déjà un).
-2. Pousse le contenu :
+1. Ouvre **youkorr/lvgl_9.5**, branche `claude/jolly-lamport-ERZOC`
+2. **Code → Codespaces → Create codespace**
+3. Dans le terminal :
 
 ```bash
-cd dist/esphome-lvgl-kawaii-face
-git init -b main
-git add -A
-git commit -m "Initial commit: ESPHome LVGL Kawaii Face"
-git remote add origin git@github.com:youkorr/esphome-lvgl-kawaii-face.git
-git push -u origin main
+gh auth setup-git
+cp -r dist/esphome-lvgl-kawaii ~/kawaii && cd ~/kawaii
+git init -b main && git add -A && git commit -m "ESPHome LVGL Kawaii Face"
+git remote add origin https://github.com/youkorr/esphome-lvgl-kawaii.git
+git push -u --force origin main
 ```
 
-## Option C — depuis l'archive du chat
+## Sur un PC
 
 ```bash
-tar xzf esphome-lvgl-kawaii-face.tar.gz
-cd esphome-lvgl-kawaii-face          # contient déjà un commit git
-git remote add origin git@github.com:youkorr/esphome-lvgl-kawaii-face.git
-git push -u origin main
+git clone https://github.com/youkorr/lvgl_9.5 -b claude/jolly-lamport-ERZOC
+cd lvgl_9.5/dist/esphome-lvgl-kawaii
+git init -b main && git add -A && git commit -m "ESPHome LVGL Kawaii Face"
+git remote add origin https://github.com/youkorr/esphome-lvgl-kawaii.git
+git push -u --force origin main
 ```
 
-## Après publication
+## Depuis l'archive du chat
 
-Utilisable dans n'importe quelle config ESPHome :
+```bash
+tar xzf esphome-lvgl-kawaii.tar.gz && cd esphome-lvgl-kawaii   # contient déjà un commit
+git remote add origin https://github.com/youkorr/esphome-lvgl-kawaii.git
+git push -u --force origin main
+```
+
+## Utilisation (dépôt public)
 
 ```yaml
 external_components:
-  - source: github://youkorr/esphome-lvgl-kawaii-face
+  - source: github://youkorr/esphome-lvgl-kawaii
     components: [lvgl_kawaii_face]
-  - source: github://youkorr/lvgl_9.5
+  - source:
+      type: git
+      url: https://github.com/youkorr/lvgl_9.5
+      ref: claude/jolly-lamport-ERZOC
     components: [lvgl]
 ```
