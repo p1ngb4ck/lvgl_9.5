@@ -1,22 +1,22 @@
-# Guide Complet des Widgets LVGL 9.4 pour ESPHome
+# Complete Guide to LVGL 9.5 Widgets for ESPHome
 
-Ce guide documente **tous les 35 widgets** disponibles dans l'implémentation LVGL 9.4 pour ESPHome.
+This guide documents **all 35 widgets** available in the LVGL 9.5 implementation for ESPHome.
 
-## Table des Matières
+## Table of Contents
 
-- [Widgets de Base](#widgets-de-base)
-- [Widgets d'Entrée](#widgets-dentrée)
-- [Widgets d'Affichage](#widgets-daffichage)
-- [Widgets de Conteneur](#widgets-de-conteneur)
-- [Widgets Avancés](#widgets-avancés)
+- [Basic Widgets](#basic-widgets)
+- [Input Widgets](#input-widgets)
+- [Display Widgets](#display-widgets)
+- [Container Widgets](#container-widgets)
+- [Advanced Widgets](#advanced-widgets)
 
 ---
 
-## Widgets de Base
+## Basic Widgets
 
-### 1. Label (Texte)
+### 1. Label (Text)
 
-Affiche du texte statique ou dynamique.
+Displays static or dynamic text.
 
 ```yaml
 lvgl:
@@ -31,26 +31,26 @@ lvgl:
             text_font: montserrat_20
             text_color: 0xFFFFFF
             text_align: CENTER
-            # Mode de texte long
+            # Long text mode
             long_mode: WRAP  # WRAP, DOT, SCROLL, SCROLL_CIRCULAR, CLIP
             width: 200
 ```
 
-**Propriétés principales**:
-- `text`: Texte à afficher
-- `text_font`: Police de caractères
-- `text_color`: Couleur du texte
-- `text_align`: Alignement (LEFT, CENTER, RIGHT)
-- `long_mode`: Comportement pour texte long
-- `recolor`: Active les codes de couleur inline
+**Main properties**:
+- `text`: Text to display
+- `text_font`: Font
+- `text_color`: Text color
+- `text_align`: Alignment (LEFT, CENTER, RIGHT)
+- `long_mode`: Behavior for long text
+- `recolor`: Enables inline color codes
 
-**Documentation**: [Label - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/label.html)
+**Documentation**: [Label - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/label.html)
 
 ---
 
-### 2. Button (Bouton)
+### 2. Button (Button)
 
-Bouton cliquable avec texte ou icône.
+Clickable button with text or icon.
 
 ```yaml
 lvgl:
@@ -62,60 +62,60 @@ lvgl:
         y: 100
         width: 120
         height: 50
-        checkable: false  # Bouton toggle si true
+        checkable: false  # Toggle button if true
         on_click:
           - logger.log: "Button clicked!"
         on_long_press:
           - logger.log: "Long press!"
 ```
 
-**Actions disponibles**:
-- `on_click`: Clic simple
-- `on_long_press`: Appui long
-- `on_press`: Début de pression
-- `on_release`: Relâchement
+**Available actions**:
+- `on_click`: Single click
+- `on_long_press`: Long press
+- `on_press`: Press start
+- `on_release`: Release
 
-**Documentation**: [Button - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/button.html)
+**Documentation**: [Button - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/button.html)
 
 ---
 
 ### 3. Image (Image)
 
-Affiche des images PNG, BMP, JPEG, GIF ou SVG.
+Displays PNG, BMP, JPEG, GIF or SVG images.
 
 ```yaml
 lvgl:
   widgets:
     - image:
         id: my_image
-        src: "S:/icons/home.svg"  # Fichier SVG sur carte SD
-        # ou
-        src: my_image_id  # Image définie dans esphome
+        src: "S:/icons/home.svg"  # SVG file on SD card
+        # or
+        src: my_image_id  # Image defined in esphome
         x: 50
         y: 50
-        width: 64   # Redimensionne (SVG uniquement)
+        width: 64   # Resizes (SVG only)
         height: 64
-        angle: 45   # Rotation en degrés (0-360)
+        angle: 45   # Rotation in degrees (0-360)
         zoom: 256   # Zoom (256 = 100%, 512 = 200%)
-        pivot_x: 50%  # Point de rotation X
-        pivot_y: 50%  # Point de rotation Y
-        antialias: true  # Lissage
+        pivot_x: 50%  # Rotation pivot X
+        pivot_y: 50%  # Rotation pivot Y
+        antialias: true  # Anti-aliasing
 ```
 
-**Formats supportés**:
-- **SVG**: Vectoriel, scalable (ThorVG)
-- **PNG**: Bitmap avec transparence
-- **BMP**: Bitmap simple
-- **JPEG**: Photos compressées
+**Supported formats**:
+- **SVG**: Vector, scalable (ThorVG)
+- **PNG**: Bitmap with transparency
+- **BMP**: Simple bitmap
+- **JPEG**: Compressed photos
 - **GIF**: Animations
 
-**Documentation**: [Image - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/image.html)
+**Documentation**: [Image - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/image.html)
 
 ---
 
-### 4. Object (Container de Base)
+### 4. Object (Base Container)
 
-Conteneur de base pour grouper des widgets.
+Base container for grouping widgets.
 
 ```yaml
 lvgl:
@@ -129,22 +129,22 @@ lvgl:
         bg_color: 0x2196F3
         border_width: 2
         border_color: 0xFFFFFF
-        radius: 10  # Coins arrondis
-        pad_all: 10  # Padding interne
+        radius: 10  # Rounded corners
+        pad_all: 10  # Internal padding
         widgets:
           - label:
               text: "Inside container"
 ```
 
-**Documentation**: [Object - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/obj.html)
+**Documentation**: [Object - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/obj.html)
 
 ---
 
-## Widgets d'Entrée
+## Input Widgets
 
-### 5. Slider (Curseur)
+### 5. Slider (Slider)
 
-Curseur pour sélectionner une valeur.
+Slider for selecting a value.
 
 ```yaml
 lvgl:
@@ -164,17 +164,17 @@ lvgl:
 ```
 
 **Modes**:
-- `NORMAL`: Valeur unique de min à max
-- `SYMMETRICAL`: Valeur centrée (0 au milieu)
-- `RANGE`: Deux valeurs (début et fin)
+- `NORMAL`: Single value from min to max
+- `SYMMETRICAL`: Centered value (0 in the middle)
+- `RANGE`: Two values (start and end)
 
-**Documentation**: [Slider - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/slider.html)
+**Documentation**: [Slider - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/slider.html)
 
 ---
 
-### 6. Switch (Interrupteur)
+### 6. Switch (Switch)
 
-Interrupteur ON/OFF.
+ON/OFF switch.
 
 ```yaml
 lvgl:
@@ -183,7 +183,7 @@ lvgl:
         id: wifi_switch
         x: 100
         y: 150
-        state: true  # ON au démarrage
+        state: true  # ON at startup
         on_change:
           - if:
               condition:
@@ -194,13 +194,13 @@ lvgl:
                 - logger.log: "Switch OFF"
 ```
 
-**Documentation**: [Switch - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/switch.html)
+**Documentation**: [Switch - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/switch.html)
 
 ---
 
-### 7. Checkbox (Case à cocher)
+### 7. Checkbox (Checkbox)
 
-Case à cocher avec label.
+Checkbox with label.
 
 ```yaml
 lvgl:
@@ -217,13 +217,13 @@ lvgl:
               args: [ 'x ? "checked" : "unchecked"' ]
 ```
 
-**Documentation**: [Checkbox - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/checkbox.html)
+**Documentation**: [Checkbox - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/checkbox.html)
 
 ---
 
-### 8. Dropdown (Liste déroulante)
+### 8. Dropdown (Dropdown List)
 
-Liste déroulante de sélection.
+Dropdown selection list.
 
 ```yaml
 lvgl:
@@ -234,7 +234,7 @@ lvgl:
         y: 100
         width: 150
         options: "Paris\nLyon\nMarseille\nToulouse"
-        # ou avec liste
+        # or with a list
         options:
           - "Paris"
           - "Lyon"
@@ -245,13 +245,13 @@ lvgl:
               ESP_LOGI("dropdown", "Selected: %d", (int)x);
 ```
 
-**Documentation**: [Dropdown - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/dropdown.html)
+**Documentation**: [Dropdown - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/dropdown.html)
 
 ---
 
-### 9. Roller (Rouleau de sélection)
+### 9. Roller (Selection Roller)
 
-Rouleau vertical pour sélection (style iOS).
+Vertical selection roller (iOS style).
 
 ```yaml
 lvgl:
@@ -264,21 +264,21 @@ lvgl:
         height: 150
         options: "00\n01\n02\n03\n04\n05"
         selected_index: 0
-        visible_row_count: 5  # Nombre de lignes visibles
-        mode: NORMAL  # NORMAL ou INFINITE (boucle)
+        visible_row_count: 5  # Number of visible rows
+        mode: NORMAL  # NORMAL or INFINITE (loop)
         on_select:
           - logger.log:
               format: "Hour: %d"
               args: [ 'x' ]
 ```
 
-**Documentation**: [Roller - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/roller.html)
+**Documentation**: [Roller - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/roller.html)
 
 ---
 
-### 10. Textarea (Zone de texte)
+### 10. Textarea (Text Area)
 
-Zone de saisie de texte multiligne.
+Multiline text input area.
 
 ```yaml
 lvgl:
@@ -292,7 +292,7 @@ lvgl:
         text: "Enter message..."
         placeholder_text: "Type here..."
         password_mode: false
-        one_line: false  # true = input sur une ligne
+        one_line: false  # true = single-line input
         max_length: 100
         accepted_chars: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 "
         on_change:
@@ -301,13 +301,13 @@ lvgl:
               args: [ 'x.c_str()' ]
 ```
 
-**Documentation**: [Textarea - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/textarea.html)
+**Documentation**: [Textarea - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/textarea.html)
 
 ---
 
-### 11. Keyboard (Clavier virtuel)
+### 11. Keyboard (Virtual Keyboard)
 
-Clavier virtuel pour saisie de texte.
+Virtual keyboard for text entry.
 
 ```yaml
 lvgl:
@@ -325,22 +325,22 @@ lvgl:
         width: 100%
         height: 200
         mode: TEXT_LOWER  # TEXT_LOWER, TEXT_UPPER, SPECIAL, NUMBER
-        textarea: input_field  # Lie au textarea
+        textarea: input_field  # Links to the textarea
 ```
 
 **Modes**:
-- `TEXT_LOWER`: Lettres minuscules
-- `TEXT_UPPER`: Lettres majuscules
-- `SPECIAL`: Caractères spéciaux
-- `NUMBER`: Pavé numérique
+- `TEXT_LOWER`: Lowercase letters
+- `TEXT_UPPER`: Uppercase letters
+- `SPECIAL`: Special characters
+- `NUMBER`: Numeric keypad
 
-**Documentation**: [Keyboard - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/keyboard.html)
+**Documentation**: [Keyboard - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/keyboard.html)
 
 ---
 
-### 12. Spinbox (Saisie numérique)
+### 12. Spinbox (Numeric Input)
 
-Saisie numérique avec boutons +/-.
+Numeric input with +/- buttons.
 
 ```yaml
 lvgl:
@@ -355,20 +355,20 @@ lvgl:
         min_value: 0
         max_value: 100
         step: 1
-        digits: 3  # Nombre de chiffres
-        decimal_places: 1  # Nombre de décimales
-        rollover: true  # Boucle à la fin
+        digits: 3  # Number of digits
+        decimal_places: 1  # Number of decimal places
+        rollover: true  # Loops at the end
 ```
 
-**Documentation**: [Spinbox - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/spinbox.html)
+**Documentation**: [Spinbox - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/spinbox.html)
 
 ---
 
-## Widgets d'Affichage
+## Display Widgets
 
-### 13. Arc (Arc circulaire)
+### 13. Arc (Circular Arc)
 
-Arc/cercle pour afficher une valeur (jauge).
+Arc/circle for displaying a value (gauge).
 
 ```yaml
 lvgl:
@@ -379,23 +379,23 @@ lvgl:
         y: 100
         width: 150
         height: 150
-        start_angle: 135  # Angle de début (0-360)
-        end_angle: 45     # Angle de fin
+        start_angle: 135  # Start angle (0-360)
+        end_angle: 45     # End angle
         value: 50
         min_value: 0
         max_value: 100
         mode: NORMAL  # NORMAL, REVERSE, SYMMETRICAL
-        rotation: 0   # Rotation globale
-        adjustable: true  # Ajustable par l'utilisateur
+        rotation: 0   # Global rotation
+        adjustable: true  # Adjustable by the user
 ```
 
-**Documentation**: [Arc - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/arc.html)
+**Documentation**: [Arc - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/arc.html)
 
 ---
 
-### 14. Bar (Barre de progression)
+### 14. Bar (Progress Bar)
 
-Barre de progression horizontale ou verticale.
+Horizontal or vertical progress bar.
 
 ```yaml
 lvgl:
@@ -416,13 +416,13 @@ lvgl:
           duration: 500ms
 ```
 
-**Documentation**: [Bar - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/bar.html)
+**Documentation**: [Bar - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/bar.html)
 
 ---
 
 ### 15. LED (LED)
 
-Indicateur LED avec couleur et luminosité.
+LED indicator with color and brightness.
 
 ```yaml
 lvgl:
@@ -433,17 +433,17 @@ lvgl:
         y: 100
         width: 30
         height: 30
-        color: 0x00FF00  # Vert
+        color: 0x00FF00  # Green
         brightness: 255  # 0-255
 ```
 
-**Documentation**: [LED - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/led.html)
+**Documentation**: [LED - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/led.html)
 
 ---
 
-### 16. Spinner (Indicateur de chargement)
+### 16. Spinner (Loading Indicator)
 
-Indicateur de chargement animé.
+Animated loading indicator.
 
 ```yaml
 lvgl:
@@ -454,17 +454,17 @@ lvgl:
         y: 150
         width: 50
         height: 50
-        spin_time: 1000ms  # Durée d'une rotation
-        arc_length: 60  # Longueur de l'arc (0-360)
+        spin_time: 1000ms  # Duration of one rotation
+        arc_length: 60  # Arc length (0-360)
 ```
 
-**Documentation**: [Spinner - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/spinner.html)
+**Documentation**: [Spinner - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/spinner.html)
 
 ---
 
-### 17. Line (Ligne)
+### 17. Line (Line)
 
-Ligne ou polyligne.
+Line or polyline.
 
 ```yaml
 lvgl:
@@ -482,16 +482,16 @@ lvgl:
             y: 0
         line_width: 3
         line_color: 0xFF0000
-        line_rounded: true  # Extrémités arrondies
+        line_rounded: true  # Rounded ends
 ```
 
-**Documentation**: [Line - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/line.html)
+**Documentation**: [Line - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/line.html)
 
 ---
 
-### 18. Scale (Échelle/Jauge) ⚡ Nouveau LVGL 9
+### 18. Scale (Scale/Gauge) ⚡ New in LVGL 9
 
-Échelle graduée linéaire ou circulaire (remplace Meter).
+Linear or circular graduated scale (replaces Meter).
 
 ```yaml
 lvgl:
@@ -508,25 +508,25 @@ lvgl:
         range:
           min: 0
           max: 200
-        angle_range: 270  # Angle total pour mode circulaire
+        angle_range: 270  # Total angle for circular mode
         rotation: 0
-        # Graduations
+        # Ticks
         total_tick_count: 21
         major_tick_every: 5
         label_count: 11
-        # Style des graduations
+        # Tick style
         tick_length: 10
         tick_width: 2
 ```
 
-**Documentation**: [Scale - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/scale.html)
-**Voir aussi**: `SCALE_WIDGET_README.md` et `SCALE_QUICK_REFERENCE.md`
+**Documentation**: [Scale - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/scale.html)
+**See also**: `SCALE_WIDGET_README.md` and `SCALE_QUICK_REFERENCE.md`
 
 ---
 
-### 19. Chart (Graphique)
+### 19. Chart (Chart)
 
-Graphique pour afficher des données.
+Chart for displaying data.
 
 ```yaml
 lvgl:
@@ -548,19 +548,19 @@ lvgl:
             width: 2
 ```
 
-**Types de graphiques**:
-- `LINE`: Courbe linéaire
-- `BAR`: Histogramme
-- `SCATTER`: Nuage de points
+**Chart types**:
+- `LINE`: Line curve
+- `BAR`: Histogram
+- `SCATTER`: Scatter plot
 
-**Documentation**: [Chart - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/chart.html)
-**Voir aussi**: `CHART_README.md`
+**Documentation**: [Chart - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/chart.html)
+**See also**: `CHART_README.md`
 
 ---
 
 ### 20. QR Code
 
-Génère et affiche un QR code.
+Generates and displays a QR code.
 
 ```yaml
 lvgl:
@@ -575,15 +575,15 @@ lvgl:
         light_color: 0xFFFFFF
 ```
 
-**Documentation**: [QR Code - LVGL 9.4](https://docs.lvgl.io/9.4/details/libs/qrcode.html)
+**Documentation**: [QR Code - LVGL 9.5](https://docs.lvgl.io/9.5/details/libs/qrcode.html)
 
 ---
 
-## Widgets Avancés
+## Advanced Widgets
 
-### 21. AnimImg (Image Animée)
+### 21. AnimImg (Animated Image)
 
-Affiche une séquence d'images animées.
+Displays a sequence of animated images.
 
 ```yaml
 lvgl:
@@ -596,18 +596,18 @@ lvgl:
           - frame1
           - frame2
           - frame3
-        duration: 100ms  # Durée par frame
-        repeat_count: -1  # -1 = infini
+        duration: 100ms  # Duration per frame
+        repeat_count: -1  # -1 = infinite
         auto_start: true
 ```
 
-**Documentation**: [AnimImg - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/animimg.html)
+**Documentation**: [AnimImg - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/animimg.html)
 
 ---
 
-### 22. Lottie (Animation Vectorielle) ⚡ Nouveau LVGL 9
+### 22. Lottie (Vector Animation) ⚡ New in LVGL 9
 
-Animations vectorielles JSON (ultra fluides).
+JSON vector animations (ultra smooth).
 
 ```yaml
 lvgl:
@@ -623,22 +623,22 @@ lvgl:
         autoplay: true
 ```
 
-**Avantages**:
-- Animations 60 FPS ultra fluides
-- 90% plus léger que les GIF
-- Redimensionnable sans perte de qualité
+**Advantages**:
+- Ultra-smooth 60 FPS animations
+- 90% lighter than GIFs
+- Resizable without loss of quality
 
-**Ressources**:
+**Resources**:
 - [Weather Icons by Basmilius](https://github.com/basmilius/weather-icons)
 - [LottieFiles](https://lottiefiles.com/)
 
-**Voir aussi**: `LOTTIE_README.md`
+**See also**: `LOTTIE_README.md`
 
 ---
 
-### 23. 3D Texture ⚡ Nouveau LVGL 9
+### 23. 3D Texture ⚡ New in LVGL 9
 
-Affiche des modèles 3D avec ThorVG.
+Displays 3D models with ThorVG.
 
 ```yaml
 lvgl:
@@ -655,13 +655,13 @@ lvgl:
         angle_z: 0
 ```
 
-**Voir aussi**: `TEX3D_README.md`
+**See also**: `TEX3D_README.md`
 
 ---
 
-### 24. Arc Label ⚡ Nouveau LVGL 9
+### 24. Arc Label ⚡ New in LVGL 9
 
-Texte courbé le long d'un arc.
+Text curved along an arc.
 
 ```yaml
 lvgl:
@@ -673,18 +673,18 @@ lvgl:
         width: 200
         height: 200
         text: "Curved Text Example"
-        angle: 270  # Angle de l'arc
+        angle: 270  # Arc angle
         radius: 100
         rotation: 0
 ```
 
-**Voir aussi**: `ARCLABEL_README.md`
+**See also**: `ARCLABEL_README.md`
 
 ---
 
-### 25. Span (Texte Enrichi)
+### 25. Span (Rich Text)
 
-Texte avec styles mixtes (gras, couleurs, tailles différentes).
+Text with mixed styles (bold, colors, different sizes).
 
 ```yaml
 lvgl:
@@ -704,16 +704,16 @@ lvgl:
             text_decor: UNDERLINE
 ```
 
-**Documentation**: [Spangroup - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/spangroup.html)
-**Voir aussi**: `SPAN_README.md`
+**Documentation**: [Spangroup - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/spangroup.html)
+**See also**: `SPAN_README.md`
 
 ---
 
-## Widgets de Conteneur
+## Container Widgets
 
-### 26. TabView (Onglets)
+### 26. TabView (Tabs)
 
-Interface à onglets.
+Tabbed interface.
 
 ```yaml
 lvgl:
@@ -739,13 +739,13 @@ lvgl:
                   text: "Settings content"
 ```
 
-**Documentation**: [TabView - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/tabview.html)
+**Documentation**: [TabView - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/tabview.html)
 
 ---
 
-### 27. TileView (Vues défilantes)
+### 27. TileView (Scrolling Views)
 
-Vues en grille avec défilement.
+Grid views with scrolling.
 
 ```yaml
 lvgl:
@@ -774,13 +774,13 @@ lvgl:
                   text: "Tile 2"
 ```
 
-**Documentation**: [TileView - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/tileview.html)
+**Documentation**: [TileView - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/tileview.html)
 
 ---
 
-### 28. Menu (Menu Hiérarchique) ⚡ Nouveau LVGL 9
+### 28. Menu (Hierarchical Menu) ⚡ New in LVGL 9
 
-Menu de navigation hiérarchique avec sidebar.
+Hierarchical navigation menu with sidebar.
 
 ```yaml
 lvgl:
@@ -810,14 +810,14 @@ lvgl:
                   text: "Bluetooth"
 ```
 
-**Documentation**: [Menu - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/menu.html)
-**Voir aussi**: `MENU_README.md`
+**Documentation**: [Menu - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/menu.html)
+**See also**: `MENU_README.md`
 
 ---
 
-### 29. Window (Fenêtre)
+### 29. Window (Window)
 
-Fenêtre avec barre de titre et boutons.
+Window with title bar and buttons.
 
 ```yaml
 lvgl:
@@ -836,14 +836,14 @@ lvgl:
               text: "Window content"
 ```
 
-**Documentation**: [Window - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/win.html)
-**Voir aussi**: `WIN_README.md`
+**Documentation**: [Window - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/win.html)
+**See also**: `WIN_README.md`
 
 ---
 
-### 30. List (Liste)
+### 30. List (List)
 
-Liste de boutons avec texte et icônes.
+List of buttons with text and icons.
 
 ```yaml
 lvgl:
@@ -862,13 +862,13 @@ lvgl:
           - text: "Item 3"
 ```
 
-**Documentation**: [List - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/list.html)
+**Documentation**: [List - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/list.html)
 
 ---
 
-### 31. Table (Tableau)
+### 31. Table (Table)
 
-Tableau avec lignes et colonnes.
+Table with rows and columns.
 
 ```yaml
 lvgl:
@@ -902,14 +902,14 @@ lvgl:
             text: "Paris"
 ```
 
-**Documentation**: [Table - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/table.html)
-**Voir aussi**: `TABLE_README.md` et `TABLE_IMPLEMENTATION_SUMMARY.md`
+**Documentation**: [Table - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/table.html)
+**See also**: `TABLE_README.md` and `TABLE_IMPLEMENTATION_SUMMARY.md`
 
 ---
 
-### 32. Calendar (Calendrier) ⚡ Nouveau LVGL 9
+### 32. Calendar (Calendar) ⚡ New in LVGL 9
 
-Calendrier mensuel interactif.
+Interactive monthly calendar.
 
 ```yaml
 lvgl:
@@ -930,14 +930,14 @@ lvgl:
               ESP_LOGI("calendar", "Selected: %d/%d/%d", day, month, year);
 ```
 
-**Documentation**: [Calendar - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/calendar.html)
-**Voir aussi**: `CALENDAR_README.md`
+**Documentation**: [Calendar - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/calendar.html)
+**See also**: `CALENDAR_README.md`
 
 ---
 
-### 33. ButtonMatrix (Matrice de Boutons)
+### 33. ButtonMatrix (Button Matrix)
 
-Grille de boutons configurables.
+Grid of configurable buttons.
 
 ```yaml
 lvgl:
@@ -975,13 +975,13 @@ lvgl:
               ESP_LOGI("btnmatrix", "Button %d clicked", button_id);
 ```
 
-**Documentation**: [ButtonMatrix - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/buttonmatrix.html)
+**Documentation**: [ButtonMatrix - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/buttonmatrix.html)
 
 ---
 
-### 34. MsgBox (Boîte de Message)
+### 34. MsgBox (Message Box)
 
-Boîte de dialogue modale.
+Modal dialog box.
 
 ```yaml
 lvgl:
@@ -989,11 +989,11 @@ lvgl:
     - msgbox:
         id: confirm_dialog
         title: "Confirmation"
-        text: "Êtes-vous sûr ?"
+        text: "Are you sure?"
         close_button: true
         buttons:
-          - "Oui"
-          - "Non"
+          - "Yes"
+          - "No"
         on_click:
           - lambda: |-
               if (button_id == 0) {
@@ -1003,13 +1003,13 @@ lvgl:
               }
 ```
 
-**Documentation**: [MsgBox - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/msgbox.html)
+**Documentation**: [MsgBox - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/msgbox.html)
 
 ---
 
-### 35. Canvas (Canevas de Dessin)
+### 35. Canvas (Drawing Canvas)
 
-Surface de dessin pour graphiques personnalisés.
+Drawing surface for custom graphics.
 
 ```yaml
 lvgl:
@@ -1023,19 +1023,19 @@ lvgl:
         bg_color: 0xFFFFFF
 ```
 
-**Fonctions de dessin** (via lambda):
-- Lignes, rectangles, cercles
-- Texte
+**Drawing functions** (via lambda):
+- Lines, rectangles, circles
+- Text
 - Images
-- Pixels individuels
+- Individual pixels
 
-**Documentation**: [Canvas - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/canvas.html)
+**Documentation**: [Canvas - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/canvas.html)
 
 ---
 
-### 36. ImageButton (Bouton Image)
+### 36. ImageButton (Image Button)
 
-Bouton avec images pour chaque état.
+Button with images for each state.
 
 ```yaml
 lvgl:
@@ -1046,30 +1046,30 @@ lvgl:
         y: 100
         width: 64
         height: 64
-        src: power_icon  # Image normale
-        src_pressed: power_icon_pressed  # Image pressée
-        src_checked: power_icon_on  # Image cochée
+        src: power_icon  # Normal image
+        src_pressed: power_icon_pressed  # Pressed image
+        src_checked: power_icon_on  # Checked image
         on_click:
           - logger.log: "Power button clicked"
 ```
 
-**Documentation**: [ImageButton - LVGL 9.4](https://docs.lvgl.io/9.4/details/widgets/imagebutton.html)
-**Voir aussi**: `IMGBTN_README.md`
+**Documentation**: [ImageButton - LVGL 9.5](https://docs.lvgl.io/9.5/details/widgets/imagebutton.html)
+**See also**: `IMGBTN_README.md`
 
 ---
 
-## Propriétés Communes à Tous les Widgets
+## Properties Common to All Widgets
 
-### Position et Taille
+### Position and Size
 
 ```yaml
-x: 100          # Position X en pixels ou %
-y: 50           # Position Y
-width: 200      # Largeur
-height: 100     # Hauteur
+x: 100          # X position in pixels or %
+y: 50           # Y position
+width: 200      # Width
+height: 100     # Height
 ```
 
-### Alignement
+### Alignment
 
 ```yaml
 align: CENTER   # TOP_LEFT, TOP_MID, TOP_RIGHT, LEFT_MID,
@@ -1081,21 +1081,21 @@ align_to: other_widget_id
 ### Style
 
 ```yaml
-bg_color: 0x2196F3      # Couleur de fond
-bg_opa: COVER           # Opacité (0-255 ou TRANSP/COVER)
-border_width: 2         # Épaisseur de la bordure
-border_color: 0xFFFFFF  # Couleur de la bordure
-radius: 10              # Rayon des coins arrondis
-pad_all: 10             # Padding uniforme
-pad_left: 5             # Padding gauche
-pad_right: 5            # Padding droit
-pad_top: 5              # Padding haut
-pad_bottom: 5           # Padding bas
-shadow_width: 10        # Largeur de l'ombre
-shadow_color: 0x000000  # Couleur de l'ombre
+bg_color: 0x2196F3      # Background color
+bg_opa: COVER           # Opacity (0-255 or TRANSP/COVER)
+border_width: 2         # Border thickness
+border_color: 0xFFFFFF  # Border color
+radius: 10              # Rounded corner radius
+pad_all: 10             # Uniform padding
+pad_left: 5             # Left padding
+pad_right: 5            # Right padding
+pad_top: 5              # Top padding
+pad_bottom: 5           # Bottom padding
+shadow_width: 10        # Shadow width
+shadow_color: 0x000000  # Shadow color
 ```
 
-### États et Parts
+### States and Parts
 
 ```yaml
 styles:
@@ -1112,51 +1112,51 @@ styles:
 
 ```yaml
 flags:
-  hidden: false         # Caché
-  clickable: true       # Cliquable
-  scrollable: true      # Défilable
-  checkable: false      # Peut être coché
+  hidden: false         # Hidden
+  clickable: true       # Clickable
+  scrollable: true      # Scrollable
+  checkable: false      # Can be checked
 ```
 
 ---
 
-## Événements Disponibles
+## Available Events
 
-Tous les widgets supportent ces événements:
+All widgets support these events:
 
-### Événements d'Entrée
-- `on_press`: Début de pression
-- `on_pressing`: Pression continue
-- `on_click`: Clic simple
-- `on_short_click`: Clic court
-- `on_long_press`: Appui long
-- `on_release`: Relâchement
-- `on_scroll`: Défilement
-- `on_focus`: Obtention du focus
-- `on_defocus`: Perte du focus
+### Input Events
+- `on_press`: Press start
+- `on_pressing`: Continuous pressing
+- `on_click`: Single click
+- `on_short_click`: Short click
+- `on_long_press`: Long press
+- `on_release`: Release
+- `on_scroll`: Scroll
+- `on_focus`: Focus gained
+- `on_defocus`: Focus lost
 
-### Événements Spéciaux
-- `on_change`: Changement de valeur
-- `on_ready`: Widget prêt
-- `on_cancel`: Annulation
+### Special Events
+- `on_change`: Value change
+- `on_ready`: Widget ready
+- `on_cancel`: Cancellation
 
-### Nouveaux Événements LVGL 9.4 ⚡
+### New LVGL 9.5 Events ⚡
 
 ```yaml
-on_single_click: ...    # 1er clic
-on_double_click: ...    # 2ème clic
-on_triple_click: ...    # 3ème clic
-on_hover_over: ...      # Survol
-on_hover_leave: ...     # Fin survol
-on_screen_loaded: ...   # Écran chargé
-on_screen_unloaded: ... # Écran déchargé
+on_single_click: ...    # 1st click
+on_double_click: ...    # 2nd click
+on_triple_click: ...    # 3rd click
+on_hover_over: ...      # Hover
+on_hover_leave: ...     # Hover end
+on_screen_loaded: ...   # Screen loaded
+on_screen_unloaded: ... # Screen unloaded
 ```
 
 ---
 
-## Actions LVGL
+## LVGL Actions
 
-Actions disponibles pour contrôler les widgets:
+Actions available to control widgets:
 
 ```yaml
 # Navigation
@@ -1175,7 +1175,7 @@ Actions disponibles pour contrôler les widgets:
 - lvgl.lottie.stop: lottie_id
 - lvgl.lottie.pause: lottie_id
 
-# État
+# State
 - lvgl.widget.enable: widget_id
 - lvgl.widget.disable: widget_id
 - lvgl.widget.show: widget_id
@@ -1184,17 +1184,17 @@ Actions disponibles pour contrôler les widgets:
 
 ---
 
-## Ressources
+## Resources
 
-### Documentation Officielle
-- [LVGL 9.4 Documentation](https://docs.lvgl.io/9.4/)
-- [Widget Catalog](https://docs.lvgl.io/9.4/details/widgets/index.html)
-- [Events Reference](https://docs.lvgl.io/9.4/details/common-widget-features/events.html)
-- [Styles Guide](https://docs.lvgl.io/9.4/details/common-widget-features/styles.html)
+### Official Documentation
+- [LVGL 9.5 Documentation](https://docs.lvgl.io/9.5/)
+- [Widget Catalog](https://docs.lvgl.io/9.5/details/widgets/index.html)
+- [Events Reference](https://docs.lvgl.io/9.5/details/common-widget-features/events.html)
+- [Styles Guide](https://docs.lvgl.io/9.5/details/common-widget-features/styles.html)
 
-### Ressources Graphiques
+### Graphic Resources
 - **SVG Icons**:
-  - [Remix Icon](https://remixicon.com/) - 2,800+ icônes
+  - [Remix Icon](https://remixicon.com/) - 2,800+ icons
   - [Ionicons](https://ionic.io/ionicons)
   - [Heroicons](https://heroicons.com/)
 
@@ -1203,20 +1203,20 @@ Actions disponibles pour contrôler les widgets:
   - [LottieFiles](https://lottiefiles.com/)
   - [Lordicon](https://lordicon.com/)
 
-### Exemples
-- [LVGL Examples](https://docs.lvgl.io/9.4/examples.html)
+### Examples
+- [LVGL Examples](https://docs.lvgl.io/9.5/examples.html)
 - [ESPHome LVGL Examples](https://esphome.io/components/lvgl.html)
 
 ---
 
-## Support et Contribution
+## Support and Contribution
 
-### Problèmes et Questions
+### Issues and Questions
 - [GitHub Issues](https://github.com/youkorr/test2_esp_video_esphome/issues)
 - [ESPHome Discord](https://discord.gg/KhAMKrd)
 
-### Documentation des Widgets
-Consultez les README spécifiques pour plus de détails:
+### Widget Documentation
+Check the specific READMEs for more details:
 - `ARCLABEL_README.md`
 - `CALENDAR_README.md`
 - `CHART_README.md`
@@ -1233,9 +1233,18 @@ Consultez les README spécifiques pour plus de détails:
 
 ---
 
-**Implémentation complète LVGL 9.4 pour ESPHome**
-✅ 35/35 widgets documentés
-✅ 70 événements supportés
-✅ ThorVG/SVG/Lottie activés
+**Complete LVGL 9.5 implementation for ESPHome**
+✅ 35/35 widgets documented
+✅ 70 events supported
+✅ ThorVG/SVG/Lottie enabled
 
 **Made with ❤️ for the ESPHome community**
+
+## License
+
+This project is a fork of the ESPHome `lvgl` component and follows the same dual-license arrangement:
+
+- **Python** code (`.py`) — MIT License
+- **C++ / runtime** code (`.c`, `.cpp`, `.h`, `.hpp`, `.tcc`, `.ino`) — GPLv3 License
+
+See the [`LICENSE`](../../LICENSE) file for the full MIT and GPLv3 texts, and [`NOTICE`](../../NOTICE) for third-party attributions (ESPHome, LVGL, Espressif, ThorVG).
