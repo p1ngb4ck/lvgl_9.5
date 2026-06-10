@@ -53,11 +53,12 @@ LICENSES/Apache-2.0.txt for the Apache License 2.0 text.
      - components/thorvg/thorvg/LICENSE
 
    ThorVG itself bundles a few third-party pieces, each keeping its own
-   license (these are in test/example folders, not built into firmware):
+   license headers:
      - RapidJSON (THL A29 / Tencent, Milo Yip) — MIT
+       (src/loaders/lottie/rapidjson/, compiled with the Lottie loader)
      - LodePNG (Lode Vandevenne) — zlib
-     - Catch2 test framework (test/catch.hpp) — BSL-1.0
-     - thorvg_example_main.c — CC0-1.0 (public domain)
+       (src/loaders/png/tvgLodePng.*, compiled with the PNG loader)
+     - thorvg_example_main.c — CC0-1.0 (public domain, example only)
 
 --------------------------------------------------------------------------
 5. lvgl_kawaii_face (when used together)
