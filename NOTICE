@@ -1,0 +1,68 @@
+lvgl_9.5 — Third-party notices
+==============================
+
+This repository's `components/lvgl` is derived from the ESPHome `lvgl`
+component and bundles code from several upstream projects. Each part keeps its
+own license. See the LICENSE file for the full MIT and GPLv3 texts, and
+LICENSES/Apache-2.0.txt for the Apache License 2.0 text.
+
+--------------------------------------------------------------------------
+1. ESPHome
+--------------------------------------------------------------------------
+   Source : https://github.com/esphome/esphome
+   License: Dual — Python code under MIT, C++/runtime code (.c, .cpp, .h,
+            .hpp, .tcc, .ino) under GPLv3.
+
+   The `components/lvgl` component (Python configuration/codegen and the
+   lvgl_esphome.* C++ runtime) is a fork of ESPHome's own lvgl component and
+   follows the same MIT/GPLv3 split. Copyright (c) 2019 ESPHome contributors.
+
+--------------------------------------------------------------------------
+2. LVGL
+--------------------------------------------------------------------------
+   Source : https://github.com/lvgl/lvgl
+   License: MIT.
+
+   The PPA draw backend is based on lvgl/lvgl pull request #9162
+   (included in LVGL 9.5+):
+     - components/lvgl/ppa/lv_draw_ppa.c / .h
+     - components/lvgl/ppa/lv_draw_ppa_buf.c
+     - components/lvgl/ppa/lv_draw_ppa_fill.c
+     - components/lvgl/ppa/lv_draw_ppa_img.c
+     - components/lvgl/ppa/lv_draw_ppa_private.h
+
+--------------------------------------------------------------------------
+3. Espressif Systems (Shanghai) CO LTD
+--------------------------------------------------------------------------
+   License: Apache-2.0 (SPDX headers are present in the files).
+   Adapted from esp-iot-solution / esp_lvgl_adapter.
+   Files:
+     - components/lvgl/lvgl_fps_benchmark.cpp
+     - components/lvgl/ppa/lvgl_ppa_accel_v9.c
+
+   SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+   SPDX-License-Identifier: Apache-2.0
+
+--------------------------------------------------------------------------
+4. ThorVG  (bundled under components/thorvg/)
+--------------------------------------------------------------------------
+   Source : https://github.com/thorvg/thorvg
+   License: MIT. Copyright (c) 2020-2026 ThorVG Project / Samsung Electronics.
+   The full library is vendored and keeps its own license files:
+     - components/thorvg/LICENSE
+     - components/thorvg/thorvg/LICENSE
+
+   ThorVG itself bundles a few third-party pieces, each keeping its own
+   license (these are in test/example folders, not built into firmware):
+     - RapidJSON (THL A29 / Tencent, Milo Yip) — MIT
+     - LodePNG (Lode Vandevenne) — zlib
+     - Catch2 test framework (test/catch.hpp) — BSL-1.0
+     - thorvg_example_main.c — CC0-1.0 (public domain)
+
+--------------------------------------------------------------------------
+5. lvgl_kawaii_face (when used together)
+--------------------------------------------------------------------------
+   Source : https://github.com/0015/lvgl_kawaii_face
+   License: MIT. Copyright (c) 2026 Eric.
+   Packaged separately as the ESPHome external component
+   https://github.com/youkorr/esphome-lvgl-kawaii
