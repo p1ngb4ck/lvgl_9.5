@@ -36,20 +36,21 @@
 *      DEFINES
 *********************/
 
+#ifdef CONFIG_CACHE_L2_CACHE_LINE_SIZE
+#define PPA_CACHE_LINE_SIZE  ((uint32_t)CONFIG_CACHE_L2_CACHE_LINE_SIZE)
+#else
+#define PPA_CACHE_LINE_SIZE  64U
+#endif
+
 /**********************
 *      TYPEDEFS
 **********************/
 
-/**
- * Round a byte size up to LV_DRAW_BUF_ALIGN (cache-line on ESP32-P4).
- * ESP-IDF PPA hardware and esp_cache_msync() both require sizes aligned to
- * the cache line — mirrors what esp_lvgl_port (common/ppa/lcd_ppa.c) does
- * via ALIGN_UP(size, CONFIG_CACHE_L2_CACHE_LINE_SIZE).
- */
+/** Round size up to cache-line boundary (required by PPA DMA and esp_cache_msync). */
 static inline uint32_t lv_draw_ppa_align_size(uint32_t size)
 {
-    return (size + (uint32_t)LV_DRAW_BUF_ALIGN - 1U)
-           & ~((uint32_t)LV_DRAW_BUF_ALIGN - 1U);
+    return (size + PPA_CACHE_LINE_SIZE - 1U)
+           & ~(PPA_CACHE_LINE_SIZE - 1U);
 }
 
 typedef struct lv_draw_ppa_unit {

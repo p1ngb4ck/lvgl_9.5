@@ -207,10 +207,13 @@ class LottieType(WidgetType):
         user_wants_hidden = "true" if config.get("hidden", False) else "false"
 
         # Use lottie_init() which handles PSRAM allocation, screen events, and task launch
+        # Get widget ID string for registry
+        widget_id = str(config[CONF_ID])
+
         if src := config.get(CONF_SRC):
             # File from filesystem
             lv_add(cg.RawStatement(f"""
-    esphome::lvgl::lottie_init({w.obj}, nullptr, 0, "{src}", {width}, {height}, {do_loop}, {do_auto_start}, {user_wants_hidden});"""))
+    esphome::lvgl::lottie_init({w.obj}, nullptr, 0, "{src}", {width}, {height}, {do_loop}, {do_auto_start}, {user_wants_hidden}, "{widget_id}");"""))
         elif file_path := config.get(CONF_FILE):
             # Embedded data
             with open(file_path, "rb") as f:
@@ -223,7 +226,7 @@ class LottieType(WidgetType):
             prog_arr = cg.progmem_array(raw_data_id, list(json_data_with_null))
 
             lv_add(cg.RawStatement(f"""
-    esphome::lvgl::lottie_init({w.obj}, {prog_arr}, {len(json_data)}, nullptr, {width}, {height}, {do_loop}, {do_auto_start}, {user_wants_hidden});"""))
+    esphome::lvgl::lottie_init({w.obj}, {prog_arr}, {len(json_data)}, nullptr, {width}, {height}, {do_loop}, {do_auto_start}, {user_wants_hidden}, "{widget_id}");"""))
 
 
 lottie_spec = LottieType()
@@ -245,7 +248,12 @@ async def lottie_start(config, action_id, template_arg, args):
     widget = await get_widgets(config)
 
     async def do_start(w: Widget):
-        lv.anim_start(lv.lottie_get_anim(w.obj))
+        from ..lvcode import lv_add
+        lv_add(cg.RawStatement(f"""
+    {{
+        auto *ctx = (esphome::lvgl::LottieContext *)lv_obj_get_user_data({w.obj});
+        if (ctx) esphome::lvgl::lottie_play(ctx);
+    }}"""))
 
     return await action_to_code(widget, do_start, action_id, template_arg, args)
 
@@ -266,7 +274,12 @@ async def lottie_stop(config, action_id, template_arg, args):
     widget = await get_widgets(config)
 
     async def do_stop(w: Widget):
-        lv.anim_delete(w.obj, literal("NULL"))
+        from ..lvcode import lv_add
+        lv_add(cg.RawStatement(f"""
+    {{
+        auto *ctx = (esphome::lvgl::LottieContext *)lv_obj_get_user_data({w.obj});
+        if (ctx) esphome::lvgl::lottie_stop(ctx);
+    }}"""))
 
     return await action_to_code(widget, do_stop, action_id, template_arg, args)
 
@@ -287,6 +300,37 @@ async def lottie_pause(config, action_id, template_arg, args):
     widget = await get_widgets(config)
 
     async def do_pause(w: Widget):
-        lv.anim_delete(w.obj, literal("NULL"))
+        from ..lvcode import lv_add
+        lv_add(cg.RawStatement(f"""
+    {{
+        auto *ctx = (esphome::lvgl::LottieContext *)lv_obj_get_user_data({w.obj});
+        if (ctx) esphome::lvgl::lottie_pause(ctx);
+    }}"""))
 
     return await action_to_code(widget, do_pause, action_id, template_arg, args)
+
+
+@automation.register_action(
+    "lvgl.lottie.restart",
+    ObjUpdateAction,
+    cv.maybe_simple_value(
+        {
+            cv.Required(CONF_ID): cv.use_id(lv_lottie_t),
+        },
+        key=CONF_ID,
+    ),
+    synchronous=True,
+)
+async def lottie_restart(config, action_id, template_arg, args):
+    """Restart the Lottie animation from frame 0."""
+    widget = await get_widgets(config)
+
+    async def do_restart(w: Widget):
+        from ..lvcode import lv_add
+        lv_add(cg.RawStatement(f"""
+    {{
+        auto *ctx = (esphome::lvgl::LottieContext *)lv_obj_get_user_data({w.obj});
+        if (ctx) esphome::lvgl::lottie_restart(ctx);
+    }}"""))
+
+    return await action_to_code(widget, do_restart, action_id, template_arg, args)

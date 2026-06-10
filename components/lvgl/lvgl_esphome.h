@@ -209,6 +209,12 @@ class LvglComponent : public PollingComponent {
   size_t draw_rounding{2};
 
   display::DisplayRotation rotation{display::DISPLAY_ROTATION_0_DEGREES};
+  // Explicit rotation set via the lvgl: `rotation:` option. When set, it takes
+  // precedence over the rotation read from the display: component in setup().
+  void set_lvgl_rotation(display::DisplayRotation rotation) {
+    this->rotation = rotation;
+    this->rotation_configured_ = true;
+  }
   void set_pause_trigger(Trigger<> *trigger) { this->pause_callback_ = trigger; }
   void set_resume_trigger(Trigger<> *trigger) { this->resume_callback_ = trigger; }
   void set_draw_start_trigger(Trigger<> *trigger) { this->draw_start_callback_ = trigger; }
@@ -227,6 +233,8 @@ class LvglComponent : public PollingComponent {
   void flush_cb_(lv_display_t *disp_drv, const lv_area_t *area, uint8_t *color_p);
 
   std::vector<display::Display *> displays_{};
+  // True when rotation was set explicitly via the lvgl: `rotation:` option.
+  bool rotation_configured_{false};
   size_t buffer_frac_{1};
   bool full_refresh_{};
   bool resume_on_input_{};
@@ -250,6 +258,18 @@ class LvglComponent : public PollingComponent {
   Trigger<> *draw_start_callback_{};
   Trigger<> *draw_end_callback_{};
   lv_color_t *rotate_buf_{};
+  // Async (pipelined) display-rotation flush, matching esp_lvgl_port: the PPA
+  // rotation + panel push run on a dedicated FreeRTOS task so they overlap the
+  // next frame's render (the blocking PPA/DMA waits yield the CPU back to the
+  // render loop). Enabled only when rotation != 0 and PPA is available.
+  uint8_t *draw_buf2_{};          // second draw buffer (double buffering)
+  void *flush_task_{nullptr};     // TaskHandle_t
+  void *flush_queue_{nullptr};    // QueueHandle_t holding a FlushJob
+  void *flush_done_sem_{nullptr}; // SemaphoreHandle_t: flush task -> main loop
+  bool async_flush_{false};
+  void flush_task_loop_();
+  static void flush_task_entry_(void *arg);
+  static void flush_wait_cb_(lv_display_t *disp);
   bool buffers_configured_{false};  // Track if lv_display_set_buffers() has been called
   size_t buf_bytes_{0};              // Store buffer size for delayed configuration
   bool loop_started_{false};  // safe to perform LVGL ops only after loop() starts
