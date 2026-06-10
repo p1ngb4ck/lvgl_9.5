@@ -59,11 +59,3 @@ LICENSES/Apache-2.0.txt for the Apache License 2.0 text.
      - LodePNG (Lode Vandevenne) — zlib
        (src/loaders/png/tvgLodePng.*, compiled with the PNG loader)
      - thorvg_example_main.c — CC0-1.0 (public domain, example only)
-
---------------------------------------------------------------------------
-5. lvgl_kawaii_face (when used together)
---------------------------------------------------------------------------
-   Source : https://github.com/0015/lvgl_kawaii_face
-   License: MIT. Copyright (c) 2026 Eric.
-   Packaged separately as the ESPHome external component
-   https://github.com/youkorr/esphome-lvgl-kawaii
