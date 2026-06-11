@@ -268,21 +268,24 @@ async def to_code(configs):
     df.add_define("LV_DRAW_BUF_ALIGN", "4")
     use_ppa = config_0.get(CONF_USE_PPA, False)
     use_ppa_img = config_0.get(CONF_USE_PPA_IMG, False)
+    use_fps_benchmark = config_0.get(CONF_USE_FPS_BENCHMARK, False)
+    use_perf_monitor = config_0.get(CONF_USE_PERF_MONITOR, False)
     # use_ppa_img implies use_ppa (SRM client needs PPA init)
     if use_ppa_img:
         use_ppa = True
-    # The PPA path is ESP32-P4 hardware: it pulls in sdkconfig.h, driver/ppa.h,
-    # esp_timer and FreeRTOS, none of which exist off-target. Skip it on
-    # non-ESP32 platforms (e.g. the host/native SDL build) so the component
-    # still compiles there.
-    if (use_ppa or use_ppa_img) and not CORE.is_esp32:
+    # These are ESP32-only features and pull in code that doesn't exist on other
+    # targets: PPA is ESP32-P4 hardware (sdkconfig.h / driver/ppa.h / esp_timer /
+    # FreeRTOS), the FPS benchmark uses Espressif's esp_lvgl_adapter, and the
+    # perf_monitor overlay relies on a FreeRTOS-only linker wrap. When the build
+    # target is not ESP32 (e.g. the host/native SDL build) they are forced off,
+    # so the SAME YAML/include file can be reused unchanged on host and ESP32.
+    if not CORE.is_esp32 and (use_ppa or use_ppa_img or use_fps_benchmark or use_perf_monitor):
         _LOGGER.warning(
-            "lvgl: 'use_ppa'/'use_ppa_img' is ESP32-only hardware acceleration; "
-            "disabling it on this platform (%s).",
+            "lvgl: use_ppa / use_ppa_img / fps_benchmark / perf_monitor are "
+            "ESP32-only; ignoring them on this platform (%s).",
             CORE.target_platform,
         )
-        use_ppa = False
-        use_ppa_img = False
+        use_ppa = use_ppa_img = use_fps_benchmark = use_perf_monitor = False
     if use_ppa:
         # LVGL 9.5 includes the PPA fix (PR #9162) natively.
         # We keep our custom PPA files as a fallback option.
@@ -293,13 +296,13 @@ async def to_code(configs):
     if use_ppa_img:
         # Enable PPA SRM hardware rotation for images (0/90/180/270 degrees)
         cg.add_define("LV_USE_PPA_IMG")
-    if config_0.get(CONF_USE_FPS_BENCHMARK, False) and CORE.is_esp32:
+    if use_fps_benchmark:
         # Espressif esp_lvgl_adapter FPS sampler (P10/25/50/75/90 report).
         # lvgl_fps_benchmark_wrapper.cpp includes esphome/core/defines.h
         # and conditionally pulls in the .c — ESPHome only auto-compiles
         # .cpp at the component root.
         cg.add_define("USE_LVGL_FPS_BENCHMARK")
-    if config_0.get(CONF_USE_PERF_MONITOR, False):
+    if use_perf_monitor:
         # On-screen FPS/CPU overlay (bottom-right corner, native LVGL widget).
         # Perf monitor is gated by LV_USE_SYSMON in lv_conf_internal.h, which
         # is itself gated by LV_USE_LOG (text rendering for the label).
