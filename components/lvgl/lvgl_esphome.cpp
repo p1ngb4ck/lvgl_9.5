@@ -6,6 +6,32 @@
 
 #include "core/lv_obj_class_private.h"
 
+// Portable bits so the component also builds on non-ESP32 targets (host/SDL).
+#ifdef USE_ESP32
+#include "esp_timer.h"
+#else
+#include <chrono>
+#endif
+#if defined(__GLIBC__) || defined(__ANDROID__)
+#include <malloc.h>  // malloc_usable_size()
+#endif
+
+namespace esphome {
+namespace lvgl {
+// Monotonic microsecond timestamp used for the perf/FPS accounting. Uses the
+// ESP timer on-target and std::chrono elsewhere.
+static inline uint64_t lvgl_now_us() {
+#ifdef USE_ESP32
+  return static_cast<uint64_t>(esp_timer_get_time());
+#else
+  return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+                                   std::chrono::steady_clock::now().time_since_epoch())
+                                   .count());
+#endif
+}
+}  // namespace lvgl
+}  // namespace esphome
+
 #ifdef USE_LVGL_PPA
 #include "driver/ppa.h"
 #include "esp_timer.h"
@@ -537,9 +563,9 @@ void LvglComponent::flush_cb_(lv_display_t *disp_drv, const lv_area_t *area, uin
     return;
   }
 #endif
-  uint64_t t0 = esp_timer_get_time();
+  uint64_t t0 = lvgl_now_us();
   this->draw_buffer_(area, reinterpret_cast<lv_color_data *>(color_p));
-  uint64_t dt = esp_timer_get_time() - t0;
+  uint64_t dt = lvgl_now_us() - t0;
   // Track flush wait time so loop() can subtract it when computing
   // CPU%% — the synchronous DMA push isn't real CPU work.
   this->perf_flush_us_ += dt;
@@ -1082,9 +1108,9 @@ void LvglComponent::loop() {
     // DMA wait into perf_flush_us_; subtract it so the reported CPU%%
     // counts only real render work (matches lvgl_camera_display's
     // approach: cpu_time / frame_interval).
-    uint64_t t0 = esp_timer_get_time();
+    uint64_t t0 = lvgl_now_us();
     lv_timer_handler();
-    uint64_t t1 = esp_timer_get_time();
+    uint64_t t1 = lvgl_now_us();
     this->perf_busy_us_ += (t1 - t0);
     uint64_t now_us = t1;
     if (this->perf_window_start_us_ == 0)

@@ -1,110 +1,110 @@
-# LVGL 9.4 Widgets - Référence Rapide
+# LVGL 9.5 Widgets - Quick Reference
 
-Guide de référence rapide pour tous les 35 widgets LVGL 9.4 disponibles dans ESPHome.
-
----
-
-## 🎯 Widgets de Base
-
-| Widget | Usage | Exemple Minimal |
-|--------|-------|-----------------|
-| **Label** | Afficher du texte | `- label: { text: "Hello" }` |
-| **Button** | Bouton cliquable | `- button: { text: "Click" }` |
-| **Image** | Afficher image/SVG | `- image: { src: "S:/icon.svg" }` |
-| **Object** | Conteneur de base | `- obj: { width: 200, height: 100 }` |
+Quick reference guide for all 35 LVGL 9.5 widgets available in ESPHome.
 
 ---
 
-## 📝 Widgets d'Entrée
+## 🎯 Basic Widgets
 
-| Widget | Usage | Propriétés Clés |
+| Widget | Usage | Minimal Example |
 |--------|-------|-----------------|
-| **Slider** | Curseur de valeur | `min_value`, `max_value`, `value` |
-| **Switch** | Interrupteur ON/OFF | `state: true/false` |
-| **Checkbox** | Case à cocher | `checked: true/false`, `text` |
-| **Dropdown** | Liste déroulante | `options`, `selected_index` |
-| **Roller** | Rouleau iOS-style | `options`, `visible_row_count` |
-| **Textarea** | Saisie texte multiligne | `text`, `placeholder_text`, `max_length` |
-| **Keyboard** | Clavier virtuel | `mode: TEXT_LOWER/TEXT_UPPER/NUMBER` |
-| **Spinbox** | Saisie numérique +/- | `min_value`, `max_value`, `step` |
+| **Label** | Display text | `- label: { text: "Hello" }` |
+| **Button** | Clickable button | `- button: { text: "Click" }` |
+| **Image** | Display image/SVG | `- image: { src: "S:/icon.svg" }` |
+| **Object** | Base container | `- obj: { width: 200, height: 100 }` |
 
 ---
 
-## 📊 Widgets d'Affichage
+## 📝 Input Widgets
 
-| Widget | Usage | Propriétés Clés |
+| Widget | Usage | Key Properties |
 |--------|-------|-----------------|
-| **Arc** | Jauge circulaire | `start_angle`, `end_angle`, `value` |
-| **Bar** | Barre de progression | `min_value`, `max_value`, `value` |
-| **LED** | Indicateur LED | `color`, `brightness` |
-| **Spinner** | Indicateur chargement | `spin_time`, `arc_length` |
-| **Line** | Ligne/polyligne | `points: [{x,y}, ...]` |
-| **Scale** ⚡ | Échelle graduée | `mode: ROUND_OUTER`, `range`, `angle_range` |
-| **Chart** | Graphique | `type: LINE/BAR`, `series` |
+| **Slider** | Value slider | `min_value`, `max_value`, `value` |
+| **Switch** | ON/OFF toggle | `state: true/false` |
+| **Checkbox** | Checkbox | `checked: true/false`, `text` |
+| **Dropdown** | Drop-down list | `options`, `selected_index` |
+| **Roller** | iOS-style roller | `options`, `visible_row_count` |
+| **Textarea** | Multiline text input | `text`, `placeholder_text`, `max_length` |
+| **Keyboard** | Virtual keyboard | `mode: TEXT_LOWER/TEXT_UPPER/NUMBER` |
+| **Spinbox** | Numeric +/- input | `min_value`, `max_value`, `step` |
+
+---
+
+## 📊 Display Widgets
+
+| Widget | Usage | Key Properties |
+|--------|-------|-----------------|
+| **Arc** | Circular gauge | `start_angle`, `end_angle`, `value` |
+| **Bar** | Progress bar | `min_value`, `max_value`, `value` |
+| **LED** | LED indicator | `color`, `brightness` |
+| **Spinner** | Loading indicator | `spin_time`, `arc_length` |
+| **Line** | Line/polyline | `points: [{x,y}, ...]` |
+| **Scale** ⚡ | Graduated scale | `mode: ROUND_OUTER`, `range`, `angle_range` |
+| **Chart** | Chart | `type: LINE/BAR`, `series` |
 | **QR Code** | QR code | `data`, `size` |
 
 ---
 
-## 🎬 Widgets Avancés
+## 🎬 Advanced Widgets
 
-| Widget | Usage | Propriétés Clés |
+| Widget | Usage | Key Properties |
 |--------|-------|-----------------|
-| **AnimImg** | Images animées | `images: [...]`, `duration` |
-| **Lottie** ⚡ | Animation vectorielle JSON | `src`, `loop`, `autoplay` |
-| **3D Texture** ⚡ | Modèle 3D | `src`, `angle_x/y/z` |
-| **Arc Label** ⚡ | Texte courbé | `text`, `angle`, `radius` |
-| **Span** | Texte enrichi | `spans: [{text, color, font}]` |
+| **AnimImg** | Animated images | `images: [...]`, `duration` |
+| **Lottie** ⚡ | JSON vector animation | `src`, `loop`, `autoplay` |
+| **3D Texture** ⚡ | 3D model | `src`, `angle_x/y/z` |
+| **Arc Label** ⚡ | Curved text | `text`, `angle`, `radius` |
+| **Span** | Rich text | `spans: [{text, color, font}]` |
 
 ---
 
-## 📦 Widgets de Conteneur
+## 📦 Container Widgets
 
-| Widget | Usage | Propriétés Clés |
+| Widget | Usage | Key Properties |
 |--------|-------|-----------------|
-| **TabView** | Interface à onglets | `tabs: [{name, widgets}]` |
-| **TileView** | Vues défilantes | `tiles: [{row, col, dir}]` |
-| **Menu** ⚡ | Menu hiérarchique | `pages: [{title, widgets}]` |
-| **Window** | Fenêtre avec titre | `title`, `close_button` |
-| **List** | Liste de boutons | `items: [{text, icon}]` |
-| **Table** | Tableau lignes/colonnes | `col_count`, `row_count`, `cells` |
-| **Calendar** ⚡ | Calendrier mensuel | `year`, `month`, `day` |
-| **ButtonMatrix** | Grille de boutons | `rows`, `buttons` |
-| **MsgBox** | Boîte de dialogue | `title`, `text`, `buttons` |
-| **Canvas** | Canevas de dessin | `width`, `height` |
-| **ImageButton** | Bouton image | `src`, `src_pressed` |
+| **TabView** | Tabbed interface | `tabs: [{name, widgets}]` |
+| **TileView** | Scrolling views | `tiles: [{row, col, dir}]` |
+| **Menu** ⚡ | Hierarchical menu | `pages: [{title, widgets}]` |
+| **Window** | Window with title | `title`, `close_button` |
+| **List** | List of buttons | `items: [{text, icon}]` |
+| **Table** | Rows/columns table | `col_count`, `row_count`, `cells` |
+| **Calendar** ⚡ | Monthly calendar | `year`, `month`, `day` |
+| **ButtonMatrix** | Grid of buttons | `rows`, `buttons` |
+| **MsgBox** | Dialog box | `title`, `text`, `buttons` |
+| **Canvas** | Drawing canvas | `width`, `height` |
+| **ImageButton** | Image button | `src`, `src_pressed` |
 
 ---
 
-## 🎨 Propriétés de Style Communes
+## 🎨 Common Style Properties
 
 ```yaml
 # Position
-x: 100          # pixels ou %
+x: 100          # pixels or %
 y: 50
 width: 200
 height: 100
 align: CENTER   # TOP_LEFT, CENTER, BOTTOM_RIGHT, etc.
 
-# Couleurs
-bg_color: 0x2196F3      # Fond
-text_color: 0xFFFFFF    # Texte
-border_color: 0x000000  # Bordure
+# Colors
+bg_color: 0x2196F3      # Background
+text_color: 0xFFFFFF    # Text
+border_color: 0x000000  # Border
 
-# Opacité
+# Opacity
 bg_opa: COVER           # TRANSP, 0-255, COVER
 
-# Bordure et Coins
+# Border and Corners
 border_width: 2
-radius: 10              # Coins arrondis
+radius: 10              # Rounded corners
 
-# Espacement
+# Padding
 pad_all: 10
 pad_left: 5
 pad_right: 5
 pad_top: 5
 pad_bottom: 5
 
-# Ombre
+# Shadow
 shadow_width: 10
 shadow_color: 0x000000
 shadow_opa: 128
@@ -112,35 +112,35 @@ shadow_opa: 128
 
 ---
 
-## 🎯 Événements Principaux
+## 🎯 Main Events
 
 ```yaml
-# Événements d'entrée
-on_press:           # Début pression
-on_pressing:        # Pression continue
-on_click:           # Clic simple
-on_short_click:     # Clic court
-on_long_press:      # Appui long
-on_release:         # Relâchement
+# Input events
+on_press:           # Press begins
+on_pressing:        # Continuous press
+on_click:           # Single click
+on_short_click:     # Short click
+on_long_press:      # Long press
+on_release:         # Release
 
-# Nouveaux LVGL 9.4 ⚡
-on_single_click:    # 1er clic
-on_double_click:    # 2ème clic
-on_triple_click:    # 3ème clic
-on_hover_over:      # Survol
-on_hover_leave:     # Fin survol
+# New in LVGL 9.5 ⚡
+on_single_click:    # 1st click
+on_double_click:    # 2nd click
+on_triple_click:    # 3rd click
+on_hover_over:      # Hover
+on_hover_leave:     # Hover end
 
-# Événements spéciaux
-on_change:          # Changement valeur
-on_ready:           # Prêt
-on_focus:           # Obtention focus
-on_defocus:         # Perte focus
-on_scroll:          # Défilement
+# Special events
+on_change:          # Value change
+on_ready:           # Ready
+on_focus:           # Gained focus
+on_defocus:         # Lost focus
+on_scroll:          # Scroll
 ```
 
 ---
 
-## 🚀 Actions LVGL
+## 🚀 LVGL Actions
 
 ```yaml
 # Navigation
@@ -148,18 +148,18 @@ on_scroll:          # Défilement
 - lvgl.page.next:
 - lvgl.page.previous:
 
-# Mise à jour widget
+# Widget update
 - lvgl.widget.update:
     id: widget_id
-    text: "Nouveau texte"
+    text: "New text"
     value: 50
 
-# Contrôle Lottie
+# Lottie control
 - lvgl.lottie.start: anim_id
 - lvgl.lottie.stop: anim_id
 - lvgl.lottie.pause: anim_id
 
-# État widget
+# Widget state
 - lvgl.widget.enable: widget_id
 - lvgl.widget.disable: widget_id
 - lvgl.widget.show: widget_id
@@ -186,59 +186,59 @@ layout:
 ```yaml
 layout:
   type: GRID
-  grid_columns: [100, 100, 100]  # Largeur colonnes
-  grid_rows: [50, 50]            # Hauteur lignes
+  grid_columns: [100, 100, 100]  # Column widths
+  grid_rows: [50, 50]            # Row heights
   grid_column_align: CENTER
   grid_row_align: CENTER
 ```
 
 ---
 
-## 🎨 États (States)
+## 🎨 States
 
 ```yaml
 styles:
-  - state: DEFAULT      # État par défaut
-  - state: CHECKED      # Coché
-  - state: FOCUSED      # A le focus
-  - state: PRESSED      # Pressé
-  - state: DISABLED     # Désactivé
-  - state: HOVERED      # Survolé
-  - state: SCROLLED     # En défilement
-  - state: EDITED       # En édition
+  - state: DEFAULT      # Default state
+  - state: CHECKED      # Checked
+  - state: FOCUSED      # Has focus
+  - state: PRESSED      # Pressed
+  - state: DISABLED     # Disabled
+  - state: HOVERED      # Hovered
+  - state: SCROLLED     # Scrolling
+  - state: EDITED       # Editing
 ```
 
 ---
 
-## 🎯 Parts (Parties)
+## 🎯 Parts
 
 ```yaml
 styles:
-  - part: MAIN          # Partie principale
-  - part: SCROLLBAR     # Barre de défilement
-  - part: INDICATOR     # Indicateur (slider, bar)
-  - part: KNOB          # Bouton (slider)
-  - part: SELECTED      # Élément sélectionné
-  - part: ITEMS         # Items multiples
-  - part: TICKS         # Graduations (scale)
-  - part: CURSOR        # Curseur (textarea)
-  - part: HEADER        # En-tête (menu, win)
-  - part: SIDEBAR       # Barre latérale (menu)
+  - part: MAIN          # Main part
+  - part: SCROLLBAR     # Scrollbar
+  - part: INDICATOR     # Indicator (slider, bar)
+  - part: KNOB          # Knob (slider)
+  - part: SELECTED      # Selected element
+  - part: ITEMS         # Multiple items
+  - part: TICKS         # Tick marks (scale)
+  - part: CURSOR        # Cursor (textarea)
+  - part: HEADER        # Header (menu, win)
+  - part: SIDEBAR       # Sidebar (menu)
 ```
 
 ---
 
-## 📏 Unités
+## 📏 Units
 
 ```yaml
 # Pixels
 width: 200          # 200 pixels
 
-# Pourcentage
-width: 50%          # 50% du parent
+# Percentage
+width: 50%          # 50% of parent
 
-# Contenu
-width: SIZE_CONTENT # Adapté au contenu
+# Content
+width: SIZE_CONTENT # Fitted to content
 ```
 
 ---
@@ -247,37 +247,37 @@ width: SIZE_CONTENT # Adapté au contenu
 
 ```yaml
 flags:
-  hidden: false         # Caché
-  clickable: true       # Cliquable
-  scrollable: false     # Défilable
-  checkable: false      # Coché/décoché
-  scroll_elastic: true  # Défilement élastique
-  scroll_momentum: true # Inertie défilement
-  snappable: false      # Alignement automatique
+  hidden: false         # Hidden
+  clickable: true       # Clickable
+  scrollable: false     # Scrollable
+  checkable: false      # Checkable
+  scroll_elastic: true  # Elastic scrolling
+  scroll_momentum: true # Scroll momentum
+  snappable: false      # Automatic snapping
 ```
 
 ---
 
-## 🖼️ Formats d'Images Supportés
+## 🖼️ Supported Image Formats
 
 | Format | Extension | Scalable | Animation | Usage |
 |--------|-----------|----------|-----------|-------|
-| **SVG** ⚡ | `.svg` | ✅ | ❌ | Icônes, logos |
-| **Lottie** ⚡ | `.json` | ✅ | ✅ | Animations fluides |
-| **PNG** | `.png` | ❌ | ❌ | Photos avec transparence |
+| **SVG** ⚡ | `.svg` | ✅ | ❌ | Icons, logos |
+| **Lottie** ⚡ | `.json` | ✅ | ✅ | Smooth animations |
+| **PNG** | `.png` | ❌ | ❌ | Photos with transparency |
 | **JPEG** | `.jpg` | ❌ | ❌ | Photos |
-| **BMP** | `.bmp` | ❌ | ❌ | Images simples |
-| **GIF** | `.gif` | ❌ | ✅ | Animations (lourd) |
+| **BMP** | `.bmp` | ❌ | ❌ | Simple images |
+| **GIF** | `.gif` | ❌ | ✅ | Animations (heavy) |
 
 ---
 
-## 💾 Chargement d'Images
+## 💾 Loading Images
 
 ```yaml
-# Depuis carte SD
+# From SD card
 src: "S:/icons/home.svg"
 
-# Depuis composant image ESPHome
+# From an ESPHome image component
 image:
   - id: my_img
     file: "images/icon.png"
@@ -290,17 +290,17 @@ lvgl:
 
 ---
 
-## 🎨 Couleurs
+## 🎨 Colors
 
 ```yaml
-# Hexadécimal RGB
-color: 0xFF0000     # Rouge
-color: 0x00FF00     # Vert
-color: 0x0000FF     # Bleu
-color: 0xFFFFFF     # Blanc
-color: 0x000000     # Noir
+# Hexadecimal RGB
+color: 0xFF0000     # Red
+color: 0x00FF00     # Green
+color: 0x0000FF     # Blue
+color: 0xFFFFFF     # White
+color: 0x000000     # Black
 
-# Couleurs Material Design
+# Material Design colors
 color: 0x2196F3     # Blue
 color: 0x4CAF50     # Green
 color: 0xF44336     # Red
@@ -310,10 +310,10 @@ color: 0x9C27B0     # Purple
 
 ---
 
-## 📝 Polices de Caractères
+## 📝 Fonts
 
 ```yaml
-# Polices LVGL intégrées
+# Built-in LVGL fonts
 text_font: montserrat_8
 text_font: montserrat_10
 text_font: montserrat_12
@@ -326,7 +326,7 @@ text_font: montserrat_28
 text_font: montserrat_32
 text_font: montserrat_48
 
-# Polices spéciales
+# Special fonts
 text_font: dejavu_16_persian_hebrew
 text_font: simsun_16_cjk
 text_font: unscii_8
@@ -348,31 +348,31 @@ animation:
 
 ---
 
-## 🔄 Modes Communs
+## 🔄 Common Modes
 
 ### Slider / Bar Mode
-- `NORMAL`: Valeur simple
-- `SYMMETRICAL`: Centré sur 0
-- `RANGE`: Deux valeurs (min-max)
+- `NORMAL`: Single value
+- `SYMMETRICAL`: Centered on 0
+- `RANGE`: Two values (min-max)
 
 ### Arc Mode
-- `NORMAL`: Arc normal
-- `REVERSE`: Arc inversé
-- `SYMMETRICAL`: Symétrique
+- `NORMAL`: Normal arc
+- `REVERSE`: Reversed arc
+- `SYMMETRICAL`: Symmetrical
 
 ### Roller Mode
-- `NORMAL`: Liste finie
-- `INFINITE`: Boucle infinie
+- `NORMAL`: Finite list
+- `INFINITE`: Infinite loop
 
 ### Keyboard Mode
-- `TEXT_LOWER`: Minuscules
-- `TEXT_UPPER`: Majuscules
-- `SPECIAL`: Caractères spéciaux
-- `NUMBER`: Pavé numérique
+- `TEXT_LOWER`: Lowercase
+- `TEXT_UPPER`: Uppercase
+- `SPECIAL`: Special characters
+- `NUMBER`: Numeric keypad
 
 ---
 
-## 📊 Exemple Complet
+## 📊 Complete Example
 
 ```yaml
 lvgl:
@@ -386,7 +386,7 @@ lvgl:
   pages:
     - id: home_page
       widgets:
-        # Titre
+        # Title
         - label:
             id: title
             text: "Dashboard"
@@ -396,7 +396,7 @@ lvgl:
             text_font: montserrat_24
             text_color: 0x2196F3
 
-        # Température avec icône SVG
+        # Temperature with SVG icon
         - image:
             src: "S:/icons/temp.svg"
             x: 50
@@ -411,7 +411,7 @@ lvgl:
             y: 90
             text_font: montserrat_20
 
-        # Slider contrôle
+        # Slider control
         - slider:
             id: brightness
             x: 50
@@ -425,19 +425,19 @@ lvgl:
                   format: "Brightness: %d"
                   args: ['x']
 
-        # Bouton d'action
+        # Action button
         - button:
             x: 50%
             y: 250
             align: TOP_MID
             width: 150
             height: 50
-            text: "Appliquer"
+            text: "Apply"
             bg_color: 0x4CAF50
             on_click:
-              - logger.log: "Paramètres appliqués"
+              - logger.log: "Settings applied"
 
-        # Animation Lottie
+        # Lottie animation
         - lottie:
             id: loading
             src: "S:/anim/loading.json"
@@ -456,62 +456,71 @@ lvgl:
 
 ---
 
-## 🆕 Nouveautés LVGL 9.4
+## 🆕 What's new in LVGL 9.5
 
-### Nouveaux Widgets ⚡
-- **Scale**: Remplace Meter (échelles linéaires/circulaires)
-- **Arc Label**: Texte courbé
-- **Lottie**: Animations vectorielles JSON 60 FPS
-- **3D Texture**: Modèles 3D avec ThorVG
-- **Menu**: Navigation hiérarchique
-- **Calendar**: Calendrier interactif
+### New Widgets ⚡
+- **Scale**: Replaces Meter (linear/circular scales)
+- **Arc Label**: Curved text
+- **Lottie**: JSON vector animations at 60 FPS
+- **3D Texture**: 3D models with ThorVG
+- **Menu**: Hierarchical navigation
+- **Calendar**: Interactive calendar
 
-### Nouvelles Fonctionnalités ⚡
-- **ThorVG**: Moteur de graphiques vectoriels intégré
-- **SVG natif**: Support SVG sans bibliothèque externe
-- **Performances**: Rendu 2x plus rapide
-- **Nouveaux événements**: 54 événements ajoutés (70 total)
-- **Nouveaux états**: État `default` ajouté
-
----
-
-## 📚 Documentation Complète
-
-- **Guide Complet**: `WIDGETS_GUIDE.md` (35 widgets détaillés)
-- **README Principal**: `README.md`
-- **Widgets Spécifiques**:
-  - `SCALE_WIDGET_README.md` - Widget Scale
-  - `SCALE_QUICK_REFERENCE.md` - Référence Scale
-  - `MENU_README.md` - Widget Menu
-  - `WIN_README.md` - Widget Window
-  - `TABLE_README.md` - Widget Table
-  - `CHART_README.md` - Widget Chart
-  - `LOTTIE_README.md` - Widget Lottie
-  - Et plus...
+### New Features ⚡
+- **ThorVG**: Built-in vector graphics engine
+- **Native SVG**: SVG support without external library
+- **Performance**: 2x faster rendering
+- **New events**: 54 events added (70 total)
+- **New states**: `default` state added
 
 ---
 
-## 🔗 Liens Utiles
+## 📚 Complete Documentation
 
-### Documentation Officielle
-- [LVGL 9.4 Docs](https://docs.lvgl.io/9.4/)
-- [Widget Catalog](https://docs.lvgl.io/9.4/details/widgets/index.html)
+- **Complete Guide**: `WIDGETS_GUIDE.md` (35 widgets in detail)
+- **Main README**: `README.md`
+- **Specific Widgets**:
+  - `SCALE_WIDGET_README.md` - Scale widget
+  - `SCALE_QUICK_REFERENCE.md` - Scale reference
+  - `MENU_README.md` - Menu widget
+  - `WIN_README.md` - Window widget
+  - `TABLE_README.md` - Table widget
+  - `CHART_README.md` - Chart widget
+  - `LOTTIE_README.md` - Lottie widget
+  - And more...
+
+---
+
+## 🔗 Useful Links
+
+### Official Documentation
+- [LVGL 9.5 Docs](https://docs.lvgl.io/9.5/)
+- [Widget Catalog](https://docs.lvgl.io/9.5/details/widgets/index.html)
 - [ESPHome LVGL](https://esphome.io/components/lvgl.html)
 
-### Ressources Graphiques
-- [Remix Icon](https://remixicon.com/) - 2800+ icônes SVG
-- [Weather Icons](https://github.com/basmilius/weather-icons) - Animations météo
-- [LottieFiles](https://lottiefiles.com/) - Animations Lottie
-- [Ionicons](https://ionic.io/ionicons) - Icônes premium
+### Graphic Resources
+- [Remix Icon](https://remixicon.com/) - 2800+ SVG icons
+- [Weather Icons](https://github.com/basmilius/weather-icons) - Weather animations
+- [LottieFiles](https://lottiefiles.com/) - Lottie animations
+- [Ionicons](https://ionic.io/ionicons) - Premium icons
 
 ---
 
-**LVGL 9.4 pour ESPHome - Implémentation Complète**
+**LVGL 9.5 for ESPHome - Complete Implementation**
 
 ✅ 35/35 widgets
-✅ 70/70 événements
-✅ 13/13 états
+✅ 70/70 events
+✅ 13/13 states
 ✅ 11/11 parts
 ✅ ThorVG + SVG + Lottie
 
 Made with ❤️ for the ESPHome community
+
+## License
+
+This project is a fork of the ESPHome `lvgl` component and follows the same dual-license arrangement:
+
+- **Python** code (`.py`) — MIT License
+- **C++ / runtime** code (`.c`, `.cpp`, `.h`, `.hpp`, `.tcc`, `.ino`) — GPLv3 License
+
+See the [`LICENSE`](../../LICENSE) file for the full MIT and GPLv3 texts, and [`NOTICE`](../../NOTICE) for third-party attributions (ESPHome, LVGL, Espressif, ThorVG).
