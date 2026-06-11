@@ -1,17 +1,21 @@
 #pragma once
 
-#ifdef USE_ESP32
-
 #include <lvgl.h>
 #if LV_USE_LOTTIE
+
+#include <map>
+#include <string>
+#include <cstring>
+#include <cstdlib>
+
+#include <src/widgets/lottie/lv_lottie_private.h>
+
+#ifdef USE_ESP32
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
-#include <cstring>
-
-#include <src/widgets/lottie/lv_lottie_private.h>
 
 namespace esphome {
 namespace lvgl {
@@ -417,5 +421,211 @@ inline bool lottie_init(lv_obj_t *obj, const void *data, size_t data_size,
 }  // namespace lvgl
 }  // namespace esphome
 
-#endif  // LV_USE_LOTTIE
+#else  // !USE_ESP32 — host / SDL build (no FreeRTOS, no PSRAM)
+
+// --------------------------------------------------------------------------
+// Host / SDL implementation
+//
+// On the desktop SDL build there is no FreeRTOS task and no PSRAM, so the
+// animation is driven on the LVGL thread with an lv_timer. We still capture
+// the native lv_lottie animation parameters and disable the built-in anim so
+// that play/pause/stop/restart behave exactly like on the ESP32 target.
+// --------------------------------------------------------------------------
+
+#include <cstdint>
+
+namespace esphome {
+namespace lvgl {
+
+// Global registry of LottieContexts - allows state machine to find contexts by name
+inline std::map<std::string, void *> &lottie_registry() {
+    static std::map<std::string, void *> registry;
+    return registry;
+}
+
+// State machine states
+enum LottieState : uint8_t {
+    LOTTIE_STATE_STOPPED = 0,
+    LOTTIE_STATE_PLAYING,
+    LOTTIE_STATE_PAUSED,
+};
+
+struct LottieContext {
+    // --- Config ---
+    lv_obj_t *obj;
+    const void *data;
+    size_t data_size;
+    const char *file_path;
+    bool loop;
+    bool auto_start;
+    uint32_t width;
+    uint32_t height;
+
+    // --- Animation params (captured from the native lv_lottie anim) ---
+    lv_anim_exec_xcb_t exec_cb;
+    void *anim_var;
+    int32_t start_frame;
+    int32_t end_frame;
+    uint32_t duration_ms;
+    bool data_loaded;
+
+    // --- Runtime state ---
+    uint8_t *pixel_buffer;
+    lv_timer_t *timer;
+    LottieState state;
+    bool restart_requested;
+    uint32_t start_ms;
+    uint32_t pause_elapsed_ms;
+    bool user_wants_hidden;
+};
+
+// Render timer – runs on the LVGL thread (~60fps)
+inline void lottie_timer_cb(lv_timer_t *t) {
+    LottieContext *ctx = (LottieContext *) lv_timer_get_user_data(t);
+    if (!ctx || !ctx->data_loaded || ctx->exec_cb == nullptr) return;
+    if (ctx->state != LOTTIE_STATE_PLAYING) return;
+
+    if (ctx->restart_requested) {
+        ctx->start_ms = lv_tick_get();
+        ctx->pause_elapsed_ms = 0;
+        ctx->restart_requested = false;
+    }
+
+    int32_t total_frames = ctx->end_frame - ctx->start_frame;
+    if (total_frames <= 0) total_frames = 1;
+    uint32_t segment_duration_ms = (uint32_t) total_frames * 1000 / 60;  // 60fps
+    if (segment_duration_ms == 0) segment_duration_ms = 1;
+
+    uint32_t elapsed_ms = ctx->pause_elapsed_ms + (lv_tick_get() - ctx->start_ms);
+
+    int32_t frame;
+    if (ctx->loop) {
+        uint32_t phase = elapsed_ms % segment_duration_ms;
+        frame = ctx->start_frame + (int32_t)((int64_t) total_frames * phase / segment_duration_ms);
+    } else {
+        if (elapsed_ms >= segment_duration_ms) {
+            ctx->exec_cb(ctx->anim_var, ctx->end_frame);
+            ctx->state = LOTTIE_STATE_STOPPED;
+            return;
+        }
+        frame = ctx->start_frame + (int32_t)((int64_t) total_frames * elapsed_ms / segment_duration_ms);
+    }
+
+    ctx->exec_cb(ctx->anim_var, frame);
+}
+
+// --------------------------------------------------------------------------
+// State machine API
+// --------------------------------------------------------------------------
+inline void lottie_play(LottieContext *ctx) {
+    if (!ctx) return;
+    if (ctx->state == LOTTIE_STATE_STOPPED) {
+        ctx->start_ms = lv_tick_get();
+        ctx->pause_elapsed_ms = 0;
+    } else if (ctx->state == LOTTIE_STATE_PAUSED) {
+        ctx->start_ms = lv_tick_get();
+    }
+    ctx->state = LOTTIE_STATE_PLAYING;
+}
+
+inline void lottie_pause(LottieContext *ctx) {
+    if (!ctx) return;
+    if (ctx->state == LOTTIE_STATE_PLAYING) {
+        ctx->pause_elapsed_ms += lv_tick_get() - ctx->start_ms;
+        ctx->state = LOTTIE_STATE_PAUSED;
+    }
+}
+
+inline void lottie_stop(LottieContext *ctx) {
+    if (!ctx) return;
+    ctx->pause_elapsed_ms = 0;
+    ctx->state = LOTTIE_STATE_STOPPED;
+    if (ctx->exec_cb) ctx->exec_cb(ctx->anim_var, ctx->start_frame);
+}
+
+inline void lottie_restart(LottieContext *ctx) {
+    if (!ctx) return;
+    ctx->restart_requested = true;
+    ctx->state = LOTTIE_STATE_PLAYING;
+}
+
+// --------------------------------------------------------------------------
+// Public API: initialise Lottie widget (host / SDL)
+// --------------------------------------------------------------------------
+inline bool lottie_init(lv_obj_t *obj, const void *data, size_t data_size,
+                        const char *file_path, uint32_t width, uint32_t height,
+                        bool loop, bool auto_start, bool user_wants_hidden,
+                        const char *widget_id = nullptr) {
+    LottieContext *ctx = (LottieContext *) calloc(1, sizeof(LottieContext));
+    if (!ctx) return false;
+
+    ctx->obj = obj;
+    ctx->data = data;
+    ctx->data_size = data_size;
+    ctx->file_path = file_path;
+    ctx->loop = loop;
+    ctx->auto_start = auto_start;
+    ctx->width = width;
+    ctx->height = height;
+    ctx->user_wants_hidden = user_wants_hidden;
+    ctx->state = LOTTIE_STATE_STOPPED;
+
+    size_t buf_bytes = (size_t) width * height * 4;
+    ctx->pixel_buffer = (uint8_t *) malloc(buf_bytes);
+    if (!ctx->pixel_buffer) {
+        free(ctx);
+        return false;
+    }
+    memset(ctx->pixel_buffer, 0, buf_bytes);
+
+    lv_obj_set_user_data(obj, ctx);
+
+    // Register in global registry so state machine can find us by name
+    if (widget_id != nullptr) {
+        lottie_registry()[std::string(widget_id)] = ctx;
+    }
+
+    lv_lottie_set_buffer(obj, width, height, ctx->pixel_buffer);
+
+    if (data != nullptr) {
+        lv_lottie_set_src_data(obj, data, data_size);
+    } else if (file_path != nullptr) {
+        lv_lottie_set_src_file(obj, file_path);
+    }
+
+    // Capture the native animation parameters, then disable the built-in anim
+    // and drive it ourselves so play/pause/stop/restart and loop=false work.
+    lv_anim_t *anim = lv_lottie_get_anim(obj);
+    if (anim != nullptr) {
+        ctx->exec_cb = anim->exec_cb;
+        ctx->anim_var = anim->var;
+        ctx->start_frame = anim->start_value;
+        ctx->end_frame = anim->end_value;
+        ctx->duration_ms = (uint32_t) lv_anim_get_time(anim);
+
+        lv_anim_delete(ctx->anim_var, ctx->exec_cb);
+        ((lv_lottie_t *) obj)->anim = NULL;
+        ctx->data_loaded = true;
+    }
+
+    if (!user_wants_hidden) {
+        lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    if (auto_start) {
+        ctx->state = LOTTIE_STATE_PLAYING;
+    }
+    ctx->start_ms = lv_tick_get();
+    ctx->pause_elapsed_ms = 0;
+
+    ctx->timer = lv_timer_create(lottie_timer_cb, 16, ctx);
+
+    return true;
+}
+
+}  // namespace lvgl
+}  // namespace esphome
+
 #endif  // USE_ESP32
+
+#endif  // LV_USE_LOTTIE
