@@ -1,4 +1,5 @@
 import importlib
+import logging
 from pathlib import Path
 import pkgutil
 
@@ -75,6 +76,8 @@ from .widgets.page import (  # page_spec used in LVGL_SCHEMA
     generate_page_triggers,
     page_spec,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 # Widget registration happens via WidgetType.__init__ in individual widget files
 # The imports below trigger creation of the widget types
@@ -268,6 +271,18 @@ async def to_code(configs):
     # use_ppa_img implies use_ppa (SRM client needs PPA init)
     if use_ppa_img:
         use_ppa = True
+    # The PPA path is ESP32-P4 hardware: it pulls in sdkconfig.h, driver/ppa.h,
+    # esp_timer and FreeRTOS, none of which exist off-target. Skip it on
+    # non-ESP32 platforms (e.g. the host/native SDL build) so the component
+    # still compiles there.
+    if (use_ppa or use_ppa_img) and not CORE.is_esp32:
+        _LOGGER.warning(
+            "lvgl: 'use_ppa'/'use_ppa_img' is ESP32-only hardware acceleration; "
+            "disabling it on this platform (%s).",
+            CORE.target_platform,
+        )
+        use_ppa = False
+        use_ppa_img = False
     if use_ppa:
         # LVGL 9.5 includes the PPA fix (PR #9162) natively.
         # We keep our custom PPA files as a fallback option.
@@ -278,7 +293,7 @@ async def to_code(configs):
     if use_ppa_img:
         # Enable PPA SRM hardware rotation for images (0/90/180/270 degrees)
         cg.add_define("LV_USE_PPA_IMG")
-    if config_0.get(CONF_USE_FPS_BENCHMARK, False):
+    if config_0.get(CONF_USE_FPS_BENCHMARK, False) and CORE.is_esp32:
         # Espressif esp_lvgl_adapter FPS sampler (P10/25/50/75/90 report).
         # lvgl_fps_benchmark_wrapper.cpp includes esphome/core/defines.h
         # and conditionally pulls in the .c — ESPHome only auto-compiles
