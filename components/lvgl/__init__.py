@@ -341,7 +341,9 @@ async def to_code(configs):
     # Side effect: LVGL sysmon's CPU%% overlay reads 100%% — a known LVGL
     # quirk with LV_OS_FREERTOS on ESPHome. Ignore the displayed CPU%%;
     # the FPS and ms numbers are still accurate.
-    df.add_define("LV_USE_OS", "LV_OS_FREERTOS")
+    # Off-ESP32 (e.g. the host/native SDL build) there is no FreeRTOS, so use
+    # LVGL's no-OS backend instead — otherwise LVGL pulls in FreeRTOS.h.
+    df.add_define("LV_USE_OS", "LV_OS_FREERTOS" if CORE.is_esp32 else "LV_OS_NONE")
 
     # Refresh period: 15 ms ≈ 66 Hz attempt rate (recommended by LVGL
     # community for smoother sysmon readings; doesn't force higher FPS).
