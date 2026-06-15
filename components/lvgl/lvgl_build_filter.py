@@ -10,9 +10,36 @@ Communication from ESPHome (__init__.py) via build flags:
   -DLVGL_USE_THORVG=1        → compile ThorVG sources
   -DLVGL_WIDGETS_USED="..."  → comma-separated list of used widget/feature names
 """
+import os
 import re
+import shutil
 
 Import("env")
+
+# ===== Patch lv_freertos.c inside the LVGL library =====
+# Our patched copy (lv_freertos_patched.c in this component dir) replaces the
+# upstream lv_freertos.c in the PlatformIO library before compilation so that
+# LVGL draw threads allocate their stacks from PSRAM instead of internal SRAM.
+# This prevents boot crashes on ESP32-P4 when LV_DRAW_THREAD_STACK_SIZE=48KB.
+_component_dir = os.path.dirname(os.path.abspath(__file__))
+_patch_src = os.path.join(_component_dir, "lv_freertos_patched.c")
+if os.path.isfile(_patch_src):
+    _project_dir = env.get("PROJECT_DIR", "")
+    _pioenv = env.get("PIOENV", "")
+    _libdeps_dir = env.get("PROJECT_LIBDEPS_DIR",
+                           os.path.join(_project_dir, ".pio", "libdeps"))
+    _candidate_dirs = list(env.get("LIBSOURCE_DIRS", [])) + [
+        os.path.join(_libdeps_dir, _pioenv, "lvgl"),
+        os.path.join(_libdeps_dir, _pioenv, "LVGL"),
+    ]
+    for _lib_dir in _candidate_dirs:
+        _target = os.path.join(_lib_dir, "src", "osal", "lv_freertos.c")
+        if os.path.isfile(_target):
+            shutil.copy2(_patch_src, _target)
+            print(f"[lvgl_build_filter] Patched {_target} with PSRAM-aware lv_thread_init")
+            break
+    else:
+        print("[lvgl_build_filter] WARNING: lv_freertos.c not found — PSRAM patch not applied")
 
 # Parse build flags from ESPHome's __init__.py
 _build_flags = " ".join(env.get("BUILD_FLAGS", []))
@@ -164,7 +191,6 @@ def lvgl_src_filter(env, node):
         "/osal/lv_cmsis_rtos2.",    # CMSIS RTOS2
         "/osal/lv_mqx.",            # MQX RTOS
         "/osal/lv_rtthread.",       # RT-Thread
-        "/osal/lv_freertos.",       # replaced by patched copy in component dir
     ]
 
     # ===== stdlib NOT for ESP32 (uses custom malloc) =====
