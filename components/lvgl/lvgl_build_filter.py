@@ -22,12 +22,15 @@ Import("env")
 # lv_os_private.h which is only resolvable from inside the LVGL library tree).
 # SCons deletes __file__ before exec and $BUILD_SCRIPT points to the platform
 # builder, not this script. Locate our script via EXTRA_SCRIPTS — PlatformIO
-# registers it there with the absolute path used at registration time.
+# registers it as "pre:<abs_path>" so strip the stage prefix before use.
 _this_script = None
 for _s in env.get("EXTRA_SCRIPTS", []):
-    _s_path = os.path.abspath(env.subst(str(_s)))
-    if os.path.basename(_s_path) == "lvgl_build_filter.py":
-        _this_script = _s_path
+    _s_str = env.subst(str(_s))
+    # Strip optional "pre:" / "post:" prefix
+    if ":" in _s_str:
+        _s_str = _s_str.split(":", 1)[1]
+    if os.path.basename(_s_str) == "lvgl_build_filter.py":
+        _this_script = _s_str
         break
 _component_dir = os.path.dirname(_this_script) if _this_script else ""
 _patch_src = os.path.join(_component_dir, "lv_freertos_psram.c.inc")
