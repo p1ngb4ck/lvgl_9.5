@@ -287,7 +287,11 @@ void LvglComponent::dump_config() {
 #ifdef USE_LVGL_PPA
   ESP_LOGCONFIG(TAG, "  PPA SRM (display rotation): %s",
                 s_display_srm_client != nullptr ? "registered (HW)" : "failed (SW fallback)");
+#if LV_USE_OS == LV_OS_NONE
   ESP_LOGCONFIG(TAG, "  PPA SW-blend handler (v9):  registered (RGB565 fills/blends → HW)");
+#else
+  ESP_LOGCONFIG(TAG, "  PPA SW-blend handler (v9):  disabled (LV_OS_FREERTOS — PPA draw unit covers fills/blends)");
+#endif
   ESP_LOGCONFIG(TAG, "  PPA draw unit:              registered (canvas/image → HW)");
 #else
   ESP_LOGCONFIG(TAG, "  PPA acceleration: disabled (use_ppa: false)");
