@@ -298,8 +298,10 @@ void LvglComponent::set_paused(bool paused, bool show_snow) {
   this->paused_ = paused;
   this->show_snow_ = show_snow;
   if (!paused && lv_screen_active() != nullptr) {
+    lv_lock();
     lv_display_trigger_activity(this->disp_);  // resets the inactivity time
     lv_obj_invalidate(lv_screen_active());
+    lv_unlock();
   }
   if (paused && this->pause_callback_ != nullptr)
     this->pause_callback_->trigger();
@@ -375,11 +377,13 @@ void LvglComponent::show_page(size_t index, lv_scr_load_anim_t anim, uint32_t ti
   if (index >= this->pages_.size())
     return;
   this->current_page_ = index;
+  lv_lock();
   if (anim == LV_SCR_LOAD_ANIM_NONE) {
     lv_screen_load(this->pages_[this->current_page_]->obj);
   } else {
     lv_scr_load_anim(this->pages_[this->current_page_]->obj, anim, time, 0, false);
   }
+  lv_unlock();
 }
 
 void LvglComponent::show_next_page(lv_scr_load_anim_t anim, uint32_t time) {
@@ -743,8 +747,10 @@ static std::string join_string(std::vector<std::string> options) {
 void LvSelectable::set_selected_text(const std::string &text, lv_anim_enable_t anim) {
   auto index = std::find(this->options_.begin(), this->options_.end(), text);
   if (index != this->options_.end()) {
+    lv_lock();
     this->set_selected_index(index - this->options_.begin(), anim);
     lv_obj_send_event(this->obj, lv_api_event, nullptr);
+    lv_unlock();
   }
 }
 
@@ -753,9 +759,11 @@ void LvSelectable::set_options(std::vector<std::string> options) {
   if (index >= options.size())
     index = options.size() - 1;
   this->options_ = std::move(options);
+  lv_lock();
   this->set_option_string(join_string(this->options_).c_str());
   lv_obj_send_event(this->obj, LV_EVENT_REFRESH, nullptr);
   this->set_selected_index(index, LV_ANIM_OFF);
+  lv_unlock();
 }
 #endif  // USE_LVGL_DROPDOWN || LV_USE_ROLLER
 
