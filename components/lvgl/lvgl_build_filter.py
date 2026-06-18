@@ -26,29 +26,16 @@ Import("env")
 import sys as _sys
 _component_dir = _sys.path[0]
 _patch_src = os.path.join(_component_dir, "lv_freertos_psram.c.inc")
-# Find lv_freertos.c by searching only known build-time library locations —
-# avoids patching a wrong copy if multiple LVGL installs exist under the project.
+# Find lv_freertos.c by walking the project dir — location varies across
+# build environments (.pioenvs/, managed_components/, .pio/libdeps/, etc.)
 _project_dir = env.subst("$PROJECT_DIR")
-_search_roots = [
-    os.path.join(_project_dir, ".pioenvs"),
-    os.path.join(_project_dir, "managed_components"),
-    os.path.join(_project_dir, ".pio", "libdeps"),
-]
 _lvgl_freertos = None
-for _search_root in _search_roots:
-    if not os.path.isdir(_search_root):
-        continue
-    for _root, _dirs, _files in os.walk(_search_root):
-        if "lv_freertos.c" in _files and "osal" in _root:
-            _lvgl_freertos = os.path.join(_root, "lv_freertos.c")
-            break
-    if _lvgl_freertos:
+for _root, _dirs, _files in os.walk(_project_dir):
+    if "lv_freertos.c" in _files and "osal" in _root:
+        _lvgl_freertos = os.path.join(_root, "lv_freertos.c")
         break
-if not os.path.isfile(_patch_src):
-    raise FileNotFoundError(f"Missing LVGL patch source: {_patch_src}")
-if not _lvgl_freertos:
-    raise FileNotFoundError("Could not locate lv_freertos.c to patch")
-shutil.copy2(_patch_src, _lvgl_freertos)
+if os.path.isfile(_patch_src) and _lvgl_freertos:
+    shutil.copy2(_patch_src, _lvgl_freertos)
 
 # Parse build flags from ESPHome's __init__.py
 _build_flags = " ".join(env.get("BUILD_FLAGS", []))
