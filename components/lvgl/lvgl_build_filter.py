@@ -23,13 +23,23 @@ Import("env")
 # __file__ is not defined in SCons context; use BUILD_SCRIPT instead.
 _component_dir = os.path.dirname(os.path.abspath(env.subst("$BUILD_SCRIPT")))
 _patch_src = os.path.join(_component_dir, "lv_freertos_psram.c.inc")
-# Find lv_freertos.c by searching from the project dir — the library path
-# varies (.pio/libdeps, .pioenvs/lib*, managed_components, etc.)
+# Find lv_freertos.c by searching only known build-time library locations —
+# avoids patching a wrong copy if multiple LVGL installs exist under the project.
 _project_dir = env.subst("$PROJECT_DIR")
+_search_roots = [
+    os.path.join(_project_dir, ".pioenvs"),
+    os.path.join(_project_dir, "managed_components"),
+    os.path.join(_project_dir, ".pio", "libdeps"),
+]
 _lvgl_freertos = None
-for _root, _dirs, _files in os.walk(_project_dir):
-    if "lv_freertos.c" in _files and "osal" in _root:
-        _lvgl_freertos = os.path.join(_root, "lv_freertos.c")
+for _search_root in _search_roots:
+    if not os.path.isdir(_search_root):
+        continue
+    for _root, _dirs, _files in os.walk(_search_root):
+        if "lv_freertos.c" in _files and "osal" in _root:
+            _lvgl_freertos = os.path.join(_root, "lv_freertos.c")
+            break
+    if _lvgl_freertos:
         break
 if not os.path.isfile(_patch_src):
     raise FileNotFoundError(f"Missing LVGL patch source: {_patch_src}")
