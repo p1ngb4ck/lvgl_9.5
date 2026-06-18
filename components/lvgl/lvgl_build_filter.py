@@ -10,9 +10,27 @@ Communication from ESPHome (__init__.py) via build flags:
   -DLVGL_USE_THORVG=1        → compile ThorVG sources
   -DLVGL_WIDGETS_USED="..."  → comma-separated list of used widget/feature names
 """
+import os
 import re
+import shutil
 
 Import("env")
+
+# Patch LVGL's lv_freertos.c with our PSRAM-aware version before compilation.
+# The patched file is stored as lv_freertos_psram.c.inc (non-.c extension so
+# ESPHome's component scanner does not try to compile it directly — it needs
+# lv_os_private.h which is only resolvable from inside the LVGL library tree).
+_component_dir = os.path.dirname(os.path.abspath(__file__))
+_patch_src = os.path.join(_component_dir, "lv_freertos_psram.c.inc")
+_lvgl_lib = env.GetProjectOption("lib_dir", "lib")
+# Locate the LVGL library inside .pio/libdeps/<env>/lvgl/
+_project_dir = env.subst("$PROJECT_DIR")
+_pio_env = env.subst("$PIOENV")
+_lvgl_freertos = os.path.join(
+    _project_dir, ".pio", "libdeps", _pio_env, "lvgl", "src", "osal", "lv_freertos.c"
+)
+if os.path.isfile(_patch_src) and os.path.isfile(_lvgl_freertos):
+    shutil.copy2(_patch_src, _lvgl_freertos)
 
 # Parse build flags from ESPHome's __init__.py
 _build_flags = " ".join(env.get("BUILD_FLAGS", []))
@@ -164,7 +182,7 @@ def lvgl_src_filter(env, node):
         "/osal/lv_cmsis_rtos2.",    # CMSIS RTOS2
         "/osal/lv_mqx.",            # MQX RTOS
         "/osal/lv_rtthread.",       # RT-Thread
-        "/osal/lv_freertos.",       # replaced by patched copy in component dir
+        # lv_freertos is patched in-place by the copy step above — not excluded
     ]
 
     # ===== stdlib NOT for ESP32 (uses custom malloc) =====
