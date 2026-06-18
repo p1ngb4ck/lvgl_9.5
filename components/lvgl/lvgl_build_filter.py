@@ -182,7 +182,7 @@ def lvgl_src_filter(env, node):
         "/osal/lv_cmsis_rtos2.",    # CMSIS RTOS2
         "/osal/lv_mqx.",            # MQX RTOS
         "/osal/lv_rtthread.",       # RT-Thread
-        # lv_freertos is patched in-place by the copy step above — not excluded
+        "/osal/lv_freertos.",       # patched copy placed by build script above
     ]
 
     # ===== stdlib NOT for ESP32 (uses custom malloc) =====
