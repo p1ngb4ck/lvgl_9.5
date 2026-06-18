@@ -20,9 +20,9 @@ Import("env")
 # The patched file is stored as lv_freertos_psram.c.inc (non-.c extension so
 # ESPHome's component scanner does not try to compile it directly — it needs
 # lv_os_private.h which is only resolvable from inside the LVGL library tree).
-_component_dir = os.path.dirname(os.path.abspath(__file__))
+# __file__ is not defined in SCons context; use BUILD_SCRIPT instead
+_component_dir = os.path.dirname(os.path.abspath(env.subst("$BUILD_SCRIPT")))
 _patch_src = os.path.join(_component_dir, "lv_freertos_psram.c.inc")
-_lvgl_lib = env.GetProjectOption("lib_dir", "lib")
 # Locate the LVGL library inside .pio/libdeps/<env>/lvgl/
 _project_dir = env.subst("$PROJECT_DIR")
 _pio_env = env.subst("$PIOENV")
