@@ -583,7 +583,7 @@ async def to_code(configs):
         df.add_define("LV_USE_SVG", "0")
         df.add_define("LV_USE_LOTTIE", "0")
         # Smaller stack when ThorVG is not used
-        df.add_define("LV_DRAW_THREAD_STACK_SIZE", "(8 * 1024)")
+        df.add_define("LV_DRAW_THREAD_STACK_SIZE", "(48 * 1024)")
         df.LOGGER.info(
             "ThorVG disabled (no SVG/Lottie widgets) - saving ~500KB flash"
         )
