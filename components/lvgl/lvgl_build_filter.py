@@ -34,10 +34,11 @@ _patch_src = os.path.join(_component_dir, "lv_freertos_psram.c.inc")
 # Find lv_freertos.c by searching only known build-time library locations —
 # avoids patching a wrong copy if multiple LVGL installs exist under the project.
 _project_dir = env.subst("$PROJECT_DIR")
+_pioenv = env.subst("$PIOENV")
 _search_roots = [
-    os.path.join(_project_dir, ".pioenvs"),
+    os.path.join(_project_dir, ".pioenvs", _pioenv),
     os.path.join(_project_dir, "managed_components"),
-    os.path.join(_project_dir, ".pio", "libdeps"),
+    os.path.join(_project_dir, ".pio", "libdeps", _pioenv),
 ]
 _lvgl_freertos = None
 for _search_root in _search_roots:
