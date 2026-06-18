@@ -81,14 +81,16 @@ static void lv_draw_img_ppa_core(lv_draw_task_t * t, const lv_draw_image_dsc_t *
     cfg.bg_alpha_fix_val     = 0xFF;
     cfg.bg_ck_en             = false;
 
-    /* Foreground input */
+    /* Foreground input: zero-alpha A8 mask so PPA treats this as a
+     * passthrough (bg fully opaque). Dimensions must match the draw
+     * buffer, not the source image, to avoid out-of-bounds DMA reads. */
     cfg.in_fg.buffer         = (void *)dest_buf;
-    cfg.in_fg.pic_w          = draw_dsc->header.w;
-    cfg.in_fg.pic_h          = draw_dsc->header.h;
+    cfg.in_fg.pic_w          = draw_buf->header.w;
+    cfg.in_fg.pic_h          = draw_buf->header.h;
     cfg.in_fg.block_w        = (uint32_t)lv_area_get_width(clipped_img_area);
     cfg.in_fg.block_h        = (uint32_t)lv_area_get_height(clipped_img_area);
-    cfg.in_fg.block_offset_x = (uint32_t)src_area.x1;
-    cfg.in_fg.block_offset_y = (uint32_t)src_area.y1;
+    cfg.in_fg.block_offset_x = (uint32_t)dest_area.x1;
+    cfg.in_fg.block_offset_y = (uint32_t)dest_area.y1;
     cfg.in_fg.blend_cm       = PPA_BLEND_COLOR_MODE_A8;
 
     cfg.fg_rgb_swap          = false;
