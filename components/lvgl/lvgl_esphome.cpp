@@ -1067,10 +1067,14 @@ void LvglComponent::setup() {
                          this->full_refresh_ ? LV_DISPLAY_RENDER_MODE_FULL : LV_DISPLAY_RENDER_MODE_PARTIAL);
   this->buffers_configured_ = true;
 
-#ifdef USE_LVGL_PPA
-  // Espressif esp-iot-solution PPA SW blend handler — accelerates all
-  // RGB565 SW blend paths (text, gradients post-rasterize, partial blends).
-  // Complements the higher-level PPA draw unit in lv_draw_ppa.c.
+#if defined(USE_LVGL_PPA) && (LV_USE_OS == LV_OS_NONE)
+  // Espressif esp-iot-solution PPA SW blend handler — accelerates RGB565
+  // fills/blends in the SW pipeline. Only safe under LV_OS_NONE where the
+  // draw unit and SW blend paths are called sequentially on one thread.
+  // Under LV_OS_FREERTOS the render task and the PPA draw unit (lv_draw_ppa)
+  // can dispatch PPA ops concurrently through different client handles,
+  // causing PPA hardware races and PSRAM heap corruption. The PPA draw unit
+  // already covers fills and image blits, so skip this handler under FreeRTOS.
   lvgl_port_ppa_v9_init(this->disp_);
 #endif
 
