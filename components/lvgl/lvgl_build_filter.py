@@ -20,8 +20,16 @@ Import("env")
 # The patched file is stored as lv_freertos_psram.c.inc (non-.c extension so
 # ESPHome's component scanner does not try to compile it directly — it needs
 # lv_os_private.h which is only resolvable from inside the LVGL library tree).
-# __file__ is not defined in SCons context; use BUILD_SCRIPT instead.
-_component_dir = os.path.dirname(os.path.abspath(env.subst("$BUILD_SCRIPT")))
+# SCons deletes __file__ before exec and $BUILD_SCRIPT points to the platform
+# builder, not this script. Locate our script via EXTRA_SCRIPTS — PlatformIO
+# registers it there with the absolute path used at registration time.
+_this_script = None
+for _s in env.get("EXTRA_SCRIPTS", []):
+    _s_path = os.path.abspath(env.subst(str(_s)))
+    if os.path.basename(_s_path) == "lvgl_build_filter.py":
+        _this_script = _s_path
+        break
+_component_dir = os.path.dirname(_this_script) if _this_script else ""
 _patch_src = os.path.join(_component_dir, "lv_freertos_psram.c.inc")
 # Find lv_freertos.c by searching only known build-time library locations —
 # avoids patching a wrong copy if multiple LVGL installs exist under the project.
