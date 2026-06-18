@@ -31,8 +31,11 @@ for _root, _dirs, _files in os.walk(_project_dir):
     if "lv_freertos.c" in _files and "osal" in _root:
         _lvgl_freertos = os.path.join(_root, "lv_freertos.c")
         break
-if _patch_src and _lvgl_freertos and os.path.isfile(_patch_src):
-    shutil.copy2(_patch_src, _lvgl_freertos)
+if not os.path.isfile(_patch_src):
+    raise FileNotFoundError(f"Missing LVGL patch source: {_patch_src}")
+if not _lvgl_freertos:
+    raise FileNotFoundError("Could not locate lv_freertos.c to patch")
+shutil.copy2(_patch_src, _lvgl_freertos)
 
 # Parse build flags from ESPHome's __init__.py
 _build_flags = " ".join(env.get("BUILD_FLAGS", []))
