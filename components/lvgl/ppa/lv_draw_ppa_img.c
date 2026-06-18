@@ -210,8 +210,7 @@ void lv_draw_ppa_img_srm(lv_draw_task_t * t, const lv_draw_image_dsc_t * dsc,
 
     uint32_t out_bpp = (dest_cf == LV_COLOR_FORMAT_RGB565) ? 2u :
                        (dest_cf == LV_COLOR_FORMAT_RGB888)  ? 3u : 4u;
-    uint32_t raw_bytes    = (uint32_t)dest_buf->header.w * dest_buf->header.h * out_bpp;
-    uint32_t aligned_size = lv_draw_ppa_align_size(raw_bytes);
+    uint32_t aligned_size = lv_draw_ppa_align_size(dest_buf->data_size);
 
     ppa_srm_oper_config_t cfg;
     lv_memzero(&cfg, sizeof(cfg));
@@ -377,8 +376,7 @@ void lv_draw_ppa_img_rotate(lv_draw_task_t * t, const lv_draw_image_dsc_t * dsc,
 
     uint32_t out_bpp_r    = (dest_cf == LV_COLOR_FORMAT_RGB565) ? 2u :
                             (dest_cf == LV_COLOR_FORMAT_RGB888)  ? 3u : 4u;
-    uint32_t aligned_size_r = lv_draw_ppa_align_size(
-                                  (uint32_t)dest_buf->header.w * dest_buf->header.h * out_bpp_r);
+    uint32_t aligned_size_r = lv_draw_ppa_align_size(dest_buf->data_size);
 
     /* Draw buffers are cache-aligned (lv_draw_buf_ppa_init_handlers). */
     cfg.out.buffer         = dest_buf->data;
