@@ -238,7 +238,52 @@ def final_validation(config_list):
                     widget_type.final_validate(name, conf, widget_conf, path[1:])
 
 
+def _patch_idf_periph_ctrl() -> None:
+    """Fix -Wliteral-suffix in IDF 5.5.x periph_ctrl.h.
+
+    IDF 5.5.x is missing a space between a string literal and CONFIG_IDF_TARGET
+    macro in the __PERIPH_CTRL_DEPRECATE_ATTR definition, triggering
+    -Wliteral-suffix in C++11 mode. Patch is idempotent and applied on every
+    build so it survives framework cache reuse.
+    """
+    if not CORE.is_esp32:
+        return
+    try:
+        from esphome.components.esp32 import idf_version
+        from esphome.espidf.framework import _get_framework_path
+
+        ver = idf_version()
+        periph_ctrl_h = (
+            _get_framework_path(f"{ver.major}.{ver.minor}.{ver.patch}")
+            / "components"
+            / "esp_hw_support"
+            / "include"
+            / "esp_private"
+            / "periph_ctrl.h"
+        )
+    except Exception:
+        return
+
+    if not periph_ctrl_h.is_file():
+        return
+
+    old = '"This function is not functional on "CONFIG_IDF_TARGET'
+    new = '"This function is not functional on " CONFIG_IDF_TARGET'
+
+    try:
+        content = periph_ctrl_h.read_text(encoding="utf-8")
+    except OSError:
+        return
+
+    if old not in content:
+        return  # already patched or not present
+
+    write_file_if_changed(periph_ctrl_h, content.replace(old, new))
+    _LOGGER.info("Patched periph_ctrl.h to fix -Wliteral-suffix (missing space before CONFIG_IDF_TARGET).")
+
+
 async def to_code(configs):
+    _patch_idf_periph_ctrl()
     config_0 = configs[0]
     # Global configuration
     cg.add_library("lvgl/lvgl", "9.5.0")
