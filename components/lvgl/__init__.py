@@ -684,18 +684,37 @@ async def to_code(configs):
             "endforeach()\n"
         )
         if atomic_patch_src.is_file():
-            # Find freertos/atomic.h in the IDF framework and patch it via Python.
-            # Uses find_program to locate python3 in the IDF venv or system PATH.
-            cmake_content += (
-                "find_program(_python3 python3 REQUIRED)\n"
-                "file(GLOB _atomic_h_candidates\n"
-                '    "$ENV{IDF_PATH}/components/freertos/FreeRTOS-Kernel/include/freertos/atomic.h"\n'
-                '    "$ENV{IDF_PATH}/components/freertos/FreeRTOS-Kernel-SMP/include/freertos/atomic.h"\n'
-                ")\n"
-                "foreach(_atomic_h IN LISTS _atomic_h_candidates)\n"
-                f'    execute_process(COMMAND "${{_python3}}" "{dst_atomic_patch.as_posix()}" "${{_atomic_h}}")\n'
-                "endforeach()\n"
-            )
+            # Resolve atomic.h paths in Python where IDF path is known, pass
+            # absolute paths directly into cmake to avoid $ENV{IDF_PATH} issues.
+            atomic_h_paths = []
+            try:
+                from esphome.components.esp32 import idf_version
+                from esphome.espidf.framework import _get_framework_path
+
+                ver = idf_version()
+                idf_base = _get_framework_path(f"{ver.major}.{ver.minor}.{ver.patch}")
+                for kernel in ("FreeRTOS-Kernel", "FreeRTOS-Kernel-SMP"):
+                    candidate = (
+                        idf_base
+                        / "components"
+                        / "freertos"
+                        / kernel
+                        / "include"
+                        / "freertos"
+                        / "atomic.h"
+                    )
+                    if candidate.is_file():
+                        atomic_h_paths.append(candidate)
+            except Exception:
+                pass
+            if atomic_h_paths:
+                cmake_content += "find_program(_python3 python3 REQUIRED)\n"
+                for atomic_h_path in atomic_h_paths:
+                    cmake_content += (
+                        f'execute_process(COMMAND "${{_python3}}"'
+                        f' "{dst_atomic_patch.as_posix()}"'
+                        f' "{atomic_h_path.as_posix()}")\n'
+                    )
         write_file_if_changed(
             CORE.relative_src_path("project_include.cmake"),
             cmake_content,
