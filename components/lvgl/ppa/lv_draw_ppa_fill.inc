@@ -8,8 +8,8 @@
 #include "sdkconfig.h"
 #ifdef CONFIG_SOC_PPA_SUPPORTED
 
-#include "lv_draw_ppa_private.h"
-#include "lv_draw_ppa.h"
+#include "lv_draw_ppa_private.hinc"
+#include "lv_draw_ppa.hinc"
 
 void lv_draw_ppa_fill(lv_draw_task_t * t, const lv_draw_fill_dsc_t * dsc,
                       const lv_area_t * coords)

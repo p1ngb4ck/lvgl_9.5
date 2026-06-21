@@ -14,8 +14,8 @@
 #include "sdkconfig.h"
 #ifdef CONFIG_SOC_PPA_SUPPORTED
 
-#include "lv_draw_ppa_private.h"
-#include "lv_draw_ppa.h"
+#include "lv_draw_ppa_private.hinc"
+#include "lv_draw_ppa.hinc"
 #include "src/draw/lv_draw_buf.h"
 #include "esp_memory_utils.h"
 #include <string.h>

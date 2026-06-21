@@ -8,8 +8,8 @@
 #include "sdkconfig.h"
 #ifdef CONFIG_SOC_PPA_SUPPORTED
 
-#include "lv_draw_ppa_private.h"
-#include "lv_draw_ppa.h"
+#include "lv_draw_ppa_private.hinc"
+#include "lv_draw_ppa.hinc"
 
 /*********************
  *      DEFINES

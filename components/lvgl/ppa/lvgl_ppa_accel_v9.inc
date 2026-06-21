@@ -11,7 +11,7 @@
 
 #ifdef CONFIG_SOC_PPA_SUPPORTED
 
-#include "lvgl_ppa_accel_v9.h"
+#include "lvgl_ppa_accel_v9.hinc"
 #include "lvgl.h"
 #include "src/draw/sw/blend/lv_draw_sw_blend.h"
 #include "src/draw/sw/blend/lv_draw_sw_blend_private.h"
