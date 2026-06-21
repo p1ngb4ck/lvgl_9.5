@@ -283,11 +283,14 @@ def _patch_idf_periph_ctrl() -> None:
 
 
 def _patch_idf_freertos_atomic() -> None:
-    """Wrap freertos/atomic.h with pragmas to suppress -Wunused-function.
+    """Remove unused static functions from freertos/atomic.h (IDF 5.5.x).
 
-    FreeRTOS atomic.h defines many static inline functions that are not all
-    used in every translation unit. Patch is idempotent — already-wrapped
-    files are a no-op.
+    The functions Atomic_CompareAndSwap_u32 and Atomic_Increment_u32 are used
+    and kept. The remaining 9 static inline functions are unused in our build
+    and are removed to eliminate -Wunused-function warnings.
+    Idempotent: sentinel string presence = already patched.
+    Specific to FreeRTOS-Kernel V10.5.1 (ESP-IDF SMP modified) as shipped
+    with IDF 5.5.x — will no-op on any version where the exact strings differ.
     """
     if not CORE.is_esp32:
         return
@@ -311,7 +314,7 @@ def _patch_idf_freertos_atomic() -> None:
     if not atomic_h.is_file():
         return
 
-    sentinel = "#pragma GCC diagnostic ignored \"-Wunused-function\""
+    sentinel = "/* Patched by ESPHome lvgl: unused functions removed */"
 
     try:
         content = atomic_h.read_text(encoding="utf-8")
@@ -321,14 +324,297 @@ def _patch_idf_freertos_atomic() -> None:
     if sentinel in content:
         return  # already patched
 
-    patched = (
-        "#pragma GCC diagnostic push\n"
-        "#pragma GCC diagnostic ignored \"-Wunused-function\"\n"
-        + content
-        + "\n#pragma GCC diagnostic pop\n"
+    # Exact function blocks to remove (unused, warned by -Wunused-function).
+    # Atomic_CompareAndSwap_u32 and Atomic_Increment_u32 are used — kept.
+    blocks_to_remove = [
+        # Atomic_SwapPointers_p32
+        (
+            "/**\n"
+            " * Atomic swap (pointers)\n"
+            " *\n"
+            " * @brief Atomically sets the address pointed to by *ppvDestination to the value\n"
+            " *        of *pvExchange.\n"
+            " *\n"
+            " * @param[in, out] ppvDestination  Pointer to memory location from where a pointer\n"
+            " *                                 value is to be loaded and written back to.\n"
+            " * @param[in] pvExchange           Pointer value to be written to *ppvDestination.\n"
+            " *\n"
+            " * @return The initial value of *ppvDestination.\n"
+            " */\n"
+            "static portFORCE_INLINE void * Atomic_SwapPointers_p32( void * volatile * ppvDestination,\n"
+            "                                                        void * pvExchange )\n"
+            "{\n"
+            "    void * pReturnValue;\n"
+            "\n"
+            "    ATOMIC_ENTER_CRITICAL();\n"
+            "    {\n"
+            "        pReturnValue = *ppvDestination;\n"
+            "        *ppvDestination = pvExchange;\n"
+            "    }\n"
+            "    ATOMIC_EXIT_CRITICAL();\n"
+            "\n"
+            "    return pReturnValue;\n"
+            "}\n"
+            "/*-----------------------------------------------------------*/\n"
+        ),
+        # Atomic_CompareAndSwapPointers_p32
+        (
+            "/**\n"
+            " * Atomic compare-and-swap (pointers)\n"
+            " *\n"
+            " * @brief Performs an atomic compare-and-swap operation on the specified pointer\n"
+            " *        values.\n"
+            " *\n"
+            " * @param[in, out] ppvDestination  Pointer to memory location from where a pointer\n"
+            " *                                 value is to be loaded and checked.\n"
+            " * @param[in] pvExchange           If condition meets, write this value to memory.\n"
+            " * @param[in] pvComparand          Swap condition.\n"
+            " *\n"
+            " * @return Unsigned integer of value 1 or 0. 1 for swapped, 0 for not swapped.\n"
+            " *\n"
+            " * @note This function only swaps *ppvDestination with pvExchange, if previous\n"
+            " *       *ppvDestination value equals pvComparand.\n"
+            " */\n"
+            "static portFORCE_INLINE uint32_t Atomic_CompareAndSwapPointers_p32( void * volatile * ppvDestination,\n"
+            "                                                                    void * pvExchange,\n"
+            "                                                                    void * pvComparand )\n"
+            "{\n"
+            "    uint32_t ulReturnValue = ATOMIC_COMPARE_AND_SWAP_FAILURE;\n"
+            "\n"
+            "    ATOMIC_ENTER_CRITICAL();\n"
+            "    {\n"
+            "        if( *ppvDestination == pvComparand )\n"
+            "        {\n"
+            "            *ppvDestination = pvExchange;\n"
+            "            ulReturnValue = ATOMIC_COMPARE_AND_SWAP_SUCCESS;\n"
+            "        }\n"
+            "    }\n"
+            "    ATOMIC_EXIT_CRITICAL();\n"
+            "\n"
+            "    return ulReturnValue;\n"
+            "}\n"
+            "\n"
+            "\n"
+        ),
+        # Atomic_Add_u32
+        (
+            "/**\n"
+            " * Atomic add\n"
+            " *\n"
+            " * @brief Atomically adds count to the value of the specified pointer points to.\n"
+            " *\n"
+            " * @param[in,out] pulAddend  Pointer to memory location from where value is to be\n"
+            " *                         loaded and written back to.\n"
+            " * @param[in] ulCount      Value to be added to *pulAddend.\n"
+            " *\n"
+            " * @return previous *pulAddend value.\n"
+            " */\n"
+            "static portFORCE_INLINE uint32_t Atomic_Add_u32( uint32_t volatile * pulAddend,\n"
+            "                                                 uint32_t ulCount )\n"
+            "{\n"
+            "    uint32_t ulCurrent;\n"
+            "\n"
+            "    ATOMIC_ENTER_CRITICAL();\n"
+            "    {\n"
+            "        ulCurrent = *pulAddend;\n"
+            "        *pulAddend += ulCount;\n"
+            "    }\n"
+            "    ATOMIC_EXIT_CRITICAL();\n"
+            "\n"
+            "    return ulCurrent;\n"
+            "}\n"
+            "/*-----------------------------------------------------------*/\n"
+        ),
+        # Atomic_Subtract_u32
+        (
+            "/**\n"
+            " * Atomic subtract\n"
+            " *\n"
+            " * @brief Atomically subtracts count from the value of the specified pointer\n"
+            " *        pointers to.\n"
+            " *\n"
+            " * @param[in,out] pulAddend  Pointer to memory location from where value is to be\n"
+            " *                         loaded and written back to.\n"
+            " * @param[in] ulCount      Value to be subtract from *pulAddend.\n"
+            " *\n"
+            " * @return previous *pulAddend value.\n"
+            " */\n"
+            "static portFORCE_INLINE uint32_t Atomic_Subtract_u32( uint32_t volatile * pulAddend,\n"
+            "                                                      uint32_t ulCount )\n"
+            "{\n"
+            "    uint32_t ulCurrent;\n"
+            "\n"
+            "    ATOMIC_ENTER_CRITICAL();\n"
+            "    {\n"
+            "        ulCurrent = *pulAddend;\n"
+            "        *pulAddend -= ulCount;\n"
+            "    }\n"
+            "    ATOMIC_EXIT_CRITICAL();\n"
+            "\n"
+            "    return ulCurrent;\n"
+            "}\n"
+            "/*-----------------------------------------------------------*/\n"
+        ),
+        # Atomic_Decrement_u32
+        (
+            "/**\n"
+            " * Atomic decrement\n"
+            " *\n"
+            " * @brief Atomically decrements the value of the specified pointer points to\n"
+            " *\n"
+            " * @param[in,out] pulAddend  Pointer to memory location from where value is to be\n"
+            " *                         loaded and written back to.\n"
+            " *\n"
+            " * @return *pulAddend value before decrement.\n"
+            " */\n"
+            "static portFORCE_INLINE uint32_t Atomic_Decrement_u32( uint32_t volatile * pulAddend )\n"
+            "{\n"
+            "    uint32_t ulCurrent;\n"
+            "\n"
+            "    ATOMIC_ENTER_CRITICAL();\n"
+            "    {\n"
+            "        ulCurrent = *pulAddend;\n"
+            "        *pulAddend -= 1;\n"
+            "    }\n"
+            "    ATOMIC_EXIT_CRITICAL();\n"
+            "\n"
+            "    return ulCurrent;\n"
+            "}\n"
+        ),
+        # Atomic_OR_u32
+        (
+            "/**\n"
+            " * Atomic OR\n"
+            " *\n"
+            " * @brief Performs an atomic OR operation on the specified values.\n"
+            " *\n"
+            " * @param [in, out] pulDestination  Pointer to memory location from where value is\n"
+            " *                                to be loaded and written back to.\n"
+            " * @param [in] ulValue            Value to be ORed with *pulDestination.\n"
+            " *\n"
+            " * @return The original value of *pulDestination.\n"
+            " */\n"
+            "static portFORCE_INLINE uint32_t Atomic_OR_u32( uint32_t volatile * pulDestination,\n"
+            "                                                uint32_t ulValue )\n"
+            "{\n"
+            "    uint32_t ulCurrent;\n"
+            "\n"
+            "    ATOMIC_ENTER_CRITICAL();\n"
+            "    {\n"
+            "        ulCurrent = *pulDestination;\n"
+            "        *pulDestination |= ulValue;\n"
+            "    }\n"
+            "    ATOMIC_EXIT_CRITICAL();\n"
+            "\n"
+            "    return ulCurrent;\n"
+            "}\n"
+            "/*-----------------------------------------------------------*/\n"
+        ),
+        # Atomic_AND_u32
+        (
+            "/**\n"
+            " * Atomic AND\n"
+            " *\n"
+            " * @brief Performs an atomic AND operation on the specified values.\n"
+            " *\n"
+            " * @param [in, out] pulDestination  Pointer to memory location from where value is\n"
+            " *                                to be loaded and written back to.\n"
+            " * @param [in] ulValue            Value to be ANDed with *pulDestination.\n"
+            " *\n"
+            " * @return The original value of *pulDestination.\n"
+            " */\n"
+            "static portFORCE_INLINE uint32_t Atomic_AND_u32( uint32_t volatile * pulDestination,\n"
+            "                                                 uint32_t ulValue )\n"
+            "{\n"
+            "    uint32_t ulCurrent;\n"
+            "\n"
+            "    ATOMIC_ENTER_CRITICAL();\n"
+            "    {\n"
+            "        ulCurrent = *pulDestination;\n"
+            "        *pulDestination &= ulValue;\n"
+            "    }\n"
+            "    ATOMIC_EXIT_CRITICAL();\n"
+            "\n"
+            "    return ulCurrent;\n"
+            "}\n"
+            "/*-----------------------------------------------------------*/\n"
+        ),
+        # Atomic_NAND_u32
+        (
+            "/**\n"
+            " * Atomic NAND\n"
+            " *\n"
+            " * @brief Performs an atomic NAND operation on the specified values.\n"
+            " *\n"
+            " * @param [in, out] pulDestination  Pointer to memory location from where value is\n"
+            " *                                to be loaded and written back to.\n"
+            " * @param [in] ulValue            Value to be NANDed with *pulDestination.\n"
+            " *\n"
+            " * @return The original value of *pulDestination.\n"
+            " */\n"
+            "static portFORCE_INLINE uint32_t Atomic_NAND_u32( uint32_t volatile * pulDestination,\n"
+            "                                                  uint32_t ulValue )\n"
+            "{\n"
+            "    uint32_t ulCurrent;\n"
+            "\n"
+            "    ATOMIC_ENTER_CRITICAL();\n"
+            "    {\n"
+            "        ulCurrent = *pulDestination;\n"
+            "        *pulDestination = ~( ulCurrent & ulValue );\n"
+            "    }\n"
+            "    ATOMIC_EXIT_CRITICAL();\n"
+            "\n"
+            "    return ulCurrent;\n"
+            "}\n"
+            "/*-----------------------------------------------------------*/\n"
+        ),
+        # Atomic_XOR_u32
+        (
+            "/**\n"
+            " * Atomic XOR\n"
+            " *\n"
+            " * @brief Performs an atomic XOR operation on the specified values.\n"
+            " *\n"
+            " * @param [in, out] pulDestination  Pointer to memory location from where value is\n"
+            " *                                to be loaded and written back to.\n"
+            " * @param [in] ulValue            Value to be XORed with *pulDestination.\n"
+            " *\n"
+            " * @return The original value of *pulDestination.\n"
+            " */\n"
+            "static portFORCE_INLINE uint32_t Atomic_XOR_u32( uint32_t volatile * pulDestination,\n"
+            "                                                 uint32_t ulValue )\n"
+            "{\n"
+            "    uint32_t ulCurrent;\n"
+            "\n"
+            "    ATOMIC_ENTER_CRITICAL();\n"
+            "    {\n"
+            "        ulCurrent = *pulDestination;\n"
+            "        *pulDestination ^= ulValue;\n"
+            "    }\n"
+            "    ATOMIC_EXIT_CRITICAL();\n"
+            "\n"
+            "    return ulCurrent;\n"
+            "}\n"
+        ),
+    ]
+
+    patched = content
+    removed = []
+    for block in blocks_to_remove:
+        if block in patched:
+            patched = patched.replace(block, "")
+            removed.append(block.split("\n")[2].strip(" *"))  # extract @brief line
+
+    if not removed:
+        return  # nothing matched — different IDF version, leave untouched
+
+    # Insert sentinel so we don't re-patch on next run
+    patched = patched.replace(
+        "/* FreeRTOS Kernel V10.5.1",
+        f"{sentinel}\n/* FreeRTOS Kernel V10.5.1",
     )
     write_file_if_changed(atomic_h, patched)
-    _LOGGER.info("Patched freertos/atomic.h to suppress -Wunused-function warnings.")
+    _LOGGER.info("Patched freertos/atomic.h: removed %d unused static functions.", len(removed))
 
 
 async def to_code(configs):
