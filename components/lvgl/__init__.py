@@ -616,7 +616,7 @@ async def to_code(configs):
     # so IDF's dependency checker allows lvgl to include headers from src/
     # (atomic.h, lv_conf.h). The installed esphome may not emit PRIV_REQUIRES src.
     if CORE.build_path:
-        pio_components_dir = Path(CORE.build_path) / "pio_components"
+        pio_components_dir = Path(CORE.build_path).parent.parent / "pio_components"
         if pio_components_dir.is_dir():
             for cmake_file in pio_components_dir.glob("*/lvgl/lvgl/CMakeLists.txt"):
                 content = cmake_file.read_text()
