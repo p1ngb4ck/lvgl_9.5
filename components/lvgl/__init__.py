@@ -608,25 +608,15 @@ async def to_code(configs):
     write_file_if_changed(lv_conf_h_file, generate_lv_conf_h())
     cg.add_build_flag("-DLV_CONF_H=1")
     cg.add_build_flag(f'-DLV_CONF_PATH=\\"{Path(lv_conf_h_file).as_posix()}\\"')
-    # Copy atomic.h shim to src/ so pio_components can find it.
-    # -I build flags are filtered to -D/-W only and never reach pio components.
+    # Patch lv_freertos.c in pio_components with our ESP_PLATFORM-conditional
+    # version to avoid the bare #include "atomic.h" that fails on IDF builds.
     component_dir = Path(__file__).parent
-    shutil.copy2(component_dir / "atomic.h", CORE.relative_src_path("atomic.h"))
-    # Patch the lvgl pio component CMakeLists.txt to add src to PRIV_REQUIRES
-    # so IDF's dependency checker allows lvgl to include headers from src/
-    # (atomic.h, lv_conf.h). The installed esphome may not emit PRIV_REQUIRES src.
-    if CORE.build_path:
+    patch_src = component_dir / "lv_freertos_psram.c.inc"
+    if CORE.build_path and patch_src.is_file():
         pio_components_dir = Path(CORE.build_path).parent.parent / "pio_components"
         if pio_components_dir.is_dir():
-            for cmake_file in pio_components_dir.glob("*/lvgl/lvgl/CMakeLists.txt"):
-                content = cmake_file.read_text()
-                if "PRIV_REQUIRES src" not in content:
-                    patched = content.replace(
-                        "idf_component_register(",
-                        "idf_component_register(\n  PRIV_REQUIRES src",
-                        1,
-                    )
-                    cmake_file.write_text(patched)
+            for target in pio_components_dir.glob("*/lvgl/lvgl/src/osal/lv_freertos.c"):
+                shutil.copy2(patch_src, target)
 
     for prop in df.get_remapped_uses():
         df.LOGGER.warning(
