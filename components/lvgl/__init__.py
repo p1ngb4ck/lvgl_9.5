@@ -293,7 +293,12 @@ async def to_code(configs):
         # PPA evaluate checks buffer alignment at runtime before claiming tasks.
         cg.add_define("USE_LVGL_PPA")
         ppa_dir = Path(__file__).parent / "ppa"
-        cg.add_build_flag(f"-I{ppa_dir}")
+        # Copy ppa/ into src/esphome/components/lvgl/ so lv_draw_ppa_wrapper.cpp
+        # can find it via relative include — -I flags don't reach the IDF compiler.
+        dst_ppa_dir = CORE.relative_src_path("esphome") / "components" / "lvgl" / "ppa"
+        if dst_ppa_dir.exists():
+            shutil.rmtree(dst_ppa_dir)
+        shutil.copytree(ppa_dir, dst_ppa_dir)
     if use_ppa_img:
         # Enable PPA SRM hardware rotation for images (0/90/180/270 degrees)
         cg.add_define("LV_USE_PPA_IMG")
