@@ -29,7 +29,7 @@ from esphome.const import (
     CONF_TRIGGER_ID,
     CONF_TYPE,
 )
-from esphome.core import CORE, ID, Lambda
+from esphome.core import CORE, ID, Lambda, coroutine_with_priority, CoroPriority
 from esphome.cpp_generator import MockObj
 from esphome.final_validate import full_config
 from esphome.helpers import write_file_if_changed
@@ -613,15 +613,21 @@ async def to_code(configs):
     write_file_if_changed(lv_conf_h_file, generate_lv_conf_h())
     cg.add_build_flag("-DLV_CONF_H=1")
     cg.add_build_flag(f'-DLV_CONF_PATH=\\"{Path(lv_conf_h_file).as_posix()}\\"')
-    # Patch lv_freertos.c in pio_components with our ESP_PLATFORM-conditional
-    # version to avoid the bare #include "atomic.h" that fails on IDF builds.
+    # Schedule the lv_freertos.c patch at FINAL priority so it runs after
+    # generate_idf_components() has populated pio_components/.
     component_dir = Path(__file__).parent
     patch_src = component_dir / "lv_freertos_psram.c.inc"
-    if CORE.build_path and patch_src.is_file():
+
+    @coroutine_with_priority(CoroPriority.FINAL)
+    async def _patch_lv_freertos():
+        if not CORE.build_path or not patch_src.is_file():
+            return
         pio_components_dir = Path(CORE.build_path).parent.parent / "pio_components"
         if pio_components_dir.is_dir():
             for target in pio_components_dir.glob("*/lvgl/lvgl/src/osal/lv_freertos.c"):
                 shutil.copy2(patch_src, target)
+
+    CORE.add_job(_patch_lv_freertos)
 
     for prop in df.get_remapped_uses():
         df.LOGGER.warning(
