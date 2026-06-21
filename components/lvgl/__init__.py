@@ -282,8 +282,58 @@ def _patch_idf_periph_ctrl() -> None:
     _LOGGER.info("Patched periph_ctrl.h to fix -Wliteral-suffix (missing space before CONFIG_IDF_TARGET).")
 
 
+def _patch_idf_freertos_atomic() -> None:
+    """Wrap freertos/atomic.h with pragmas to suppress -Wunused-function.
+
+    FreeRTOS atomic.h defines many static inline functions that are not all
+    used in every translation unit. Patch is idempotent — already-wrapped
+    files are a no-op.
+    """
+    if not CORE.is_esp32:
+        return
+    try:
+        from esphome.components.esp32 import idf_version
+        from esphome.espidf.framework import _get_framework_path
+
+        ver = idf_version()
+        atomic_h = (
+            _get_framework_path(f"{ver.major}.{ver.minor}.{ver.patch}")
+            / "components"
+            / "freertos"
+            / "FreeRTOS-Kernel"
+            / "include"
+            / "freertos"
+            / "atomic.h"
+        )
+    except Exception:
+        return
+
+    if not atomic_h.is_file():
+        return
+
+    sentinel = "#pragma GCC diagnostic ignored \"-Wunused-function\""
+
+    try:
+        content = atomic_h.read_text(encoding="utf-8")
+    except OSError:
+        return
+
+    if sentinel in content:
+        return  # already patched
+
+    patched = (
+        "#pragma GCC diagnostic push\n"
+        "#pragma GCC diagnostic ignored \"-Wunused-function\"\n"
+        + content
+        + "\n#pragma GCC diagnostic pop\n"
+    )
+    write_file_if_changed(atomic_h, patched)
+    _LOGGER.info("Patched freertos/atomic.h to suppress -Wunused-function warnings.")
+
+
 async def to_code(configs):
     _patch_idf_periph_ctrl()
+    _patch_idf_freertos_atomic()
     config_0 = configs[0]
     # Global configuration
     cg.add_library("lvgl/lvgl", "9.5.0")
