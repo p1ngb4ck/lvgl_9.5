@@ -378,7 +378,7 @@ async def to_code(configs):
         "LV_COLOR_CHROMA_KEY",
         await lvalid.lv_color.process(config_0[df.CONF_TRANSPARENCY_KEY]),
     )
-    cg.add_build_flag("-Isrc")
+    cg.add_build_flag(f"-I{CORE.relative_src_path().as_posix()}")
 
     cg.add_global(lvgl_ns.using)
     for font in helpers.esphome_fonts_used:
@@ -607,7 +607,7 @@ async def to_code(configs):
     lv_conf_h_file = CORE.relative_src_path(LV_CONF_FILENAME)
     write_file_if_changed(lv_conf_h_file, generate_lv_conf_h())
     cg.add_build_flag("-DLV_CONF_H=1")
-    cg.add_build_flag(f'-DLV_CONF_PATH=\\"{lv_conf_h_file}\\"')
+    cg.add_build_flag(f'-DLV_CONF_PATH=\\"{Path(lv_conf_h_file).as_posix()}\\"')
     # Copy atomic.h shim to src/ so pio_components can find it.
     # -I build flags are filtered to -D/-W only and never reach pio components.
     component_dir = Path(__file__).parent
