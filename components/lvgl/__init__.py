@@ -618,7 +618,7 @@ async def to_code(configs):
     component_dir = Path(__file__).parent
     patch_src = component_dir / "lv_freertos_psram.c.inc"
 
-    @coroutine_with_priority(CoroPriority.FINAL)
+    @coroutine_with_priority(CoroPriority.FINAL - 2)
     async def _patch_lv_freertos():
         if not CORE.build_path or not patch_src.is_file():
             return
