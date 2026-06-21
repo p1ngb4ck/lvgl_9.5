@@ -612,6 +612,21 @@ async def to_code(configs):
     # -I build flags are filtered to -D/-W only and never reach pio components.
     component_dir = Path(__file__).parent
     shutil.copy2(component_dir / "atomic.h", CORE.relative_src_path("atomic.h"))
+    # Patch the lvgl pio component CMakeLists.txt to add src to PRIV_REQUIRES
+    # so IDF's dependency checker allows lvgl to include headers from src/
+    # (atomic.h, lv_conf.h). The installed esphome may not emit PRIV_REQUIRES src.
+    if CORE.build_path:
+        pio_components_dir = Path(CORE.build_path) / "pio_components"
+        if pio_components_dir.is_dir():
+            for cmake_file in pio_components_dir.glob("*/lvgl/lvgl/CMakeLists.txt"):
+                content = cmake_file.read_text()
+                if "PRIV_REQUIRES src" not in content:
+                    patched = content.replace(
+                        "idf_component_register(",
+                        "idf_component_register(\n  PRIV_REQUIRES src",
+                        1,
+                    )
+                    cmake_file.write_text(patched)
 
     for prop in df.get_remapped_uses():
         df.LOGGER.warning(
