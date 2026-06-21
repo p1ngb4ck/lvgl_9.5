@@ -634,7 +634,6 @@ async def to_code(configs):
             f'    configure_file("{dst_patch.as_posix()}" "${{_target}}" COPYONLY)\n'
             "endforeach()\n"
         )
-        from esphome.helpers import write_file_if_changed
         write_file_if_changed(
             CORE.relative_src_path("project_include.cmake"),
             cmake_content,
