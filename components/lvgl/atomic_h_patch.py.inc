@@ -238,9 +238,14 @@ for block in blocks_to_remove:
 if not removed:
     sys.exit(0)  # nothing matched — different IDF version, leave untouched
 
-patched = patched.replace(
-    "/* FreeRTOS Kernel V10.5.1",
-    f"{sentinel}\n/* FreeRTOS Kernel V10.5.1",
+# Wrap entire file with GCC diagnostic pragmas to suppress -Wunused-function
+# for the 2 pointer functions kept but falsely warned (used by RISC-V port.c).
+patched = (
+    f"{sentinel}\n"
+    "#pragma GCC diagnostic push\n"
+    "#pragma GCC diagnostic ignored \"-Wunused-function\"\n"
+    + patched
+    + "\n#pragma GCC diagnostic pop\n"
 )
 atomic_h.write_text(patched, encoding="utf-8")
-print(f"Patched freertos/atomic.h: removed {removed} unused static functions.")
+print(f"Patched freertos/atomic.h: removed {removed} unused static functions, pragma-wrapped remainder.")
