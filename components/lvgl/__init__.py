@@ -283,14 +283,18 @@ def _patch_idf_periph_ctrl() -> None:
 
 
 def _patch_idf_freertos_atomic() -> None:
-    """Remove unused static functions from freertos/atomic.h (IDF 5.5.x).
+    """Fix -Wunused-function warnings from freertos/atomic.h (IDF 5.5.x).
 
-    Kept (actually used):
-      Atomic_CompareAndSwap_u32, Atomic_Increment_u32,
-      Atomic_SwapPointers_p32, Atomic_CompareAndSwapPointers_p32
-    Removed (unused, warned by -Wunused-function):
+    Removed (truly unused, -Wunused-function):
       Atomic_Add_u32, Atomic_Subtract_u32, Atomic_Decrement_u32,
       Atomic_OR_u32, Atomic_AND_u32, Atomic_NAND_u32, Atomic_XOR_u32
+    Kept + pragma-suppressed (used by RISC-V port.c, falsely warned):
+      Atomic_SwapPointers_p32, Atomic_CompareAndSwapPointers_p32
+    Kept without suppression (actually detected as used):
+      Atomic_CompareAndSwap_u32, Atomic_Increment_u32
+
+    Wraps the entire file with GCC diagnostic pragmas so it works on the
+    1st compile (framework-espidf is already present when to_code() runs).
     Idempotent: sentinel string presence = already patched.
     Specific to FreeRTOS-Kernel V10.5.1 (ESP-IDF SMP modified) as shipped
     with IDF 5.5.x — will no-op on any version where the exact strings differ.
@@ -317,7 +321,7 @@ def _patch_idf_freertos_atomic() -> None:
     if not atomic_h.is_file():
         return
 
-    sentinel = "/* Patched by ESPHome lvgl: unused functions removed */"
+    sentinel = "/* Patched by ESPHome lvgl: unused functions removed, pragma-wrapped */"
 
     try:
         content = atomic_h.read_text(encoding="utf-8")
@@ -327,8 +331,10 @@ def _patch_idf_freertos_atomic() -> None:
     if sentinel in content:
         return  # already patched
 
-    # Exact function blocks to remove (unused, warned by -Wunused-function).
-    # Atomic_CompareAndSwap_u32 and Atomic_Increment_u32 are used — kept.
+    # Exact function blocks to remove (truly unused, warned by -Wunused-function).
+    # Atomic_CompareAndSwap_u32 and Atomic_Increment_u32 are used — kept without suppression.
+    # Atomic_SwapPointers_p32 and Atomic_CompareAndSwapPointers_p32 are used by RISC-V
+    # port.c but falsely warned — kept, suppressed by the pragma wrap below.
     blocks_to_remove = [
         # Atomic_Add_u32
         (
@@ -542,13 +548,17 @@ def _patch_idf_freertos_atomic() -> None:
     if not removed:
         return  # nothing matched — different IDF version, leave untouched
 
-    # Insert sentinel so we don't re-patch on next run
-    patched = patched.replace(
-        "/* FreeRTOS Kernel V10.5.1",
-        f"{sentinel}\n/* FreeRTOS Kernel V10.5.1",
+    # Wrap entire file with GCC diagnostic pragmas so the 2 pointer functions
+    # (kept but falsely warned) are suppressed from the very first compile.
+    patched = (
+        f"{sentinel}\n"
+        "#pragma GCC diagnostic push\n"
+        "#pragma GCC diagnostic ignored \"-Wunused-function\"\n"
+        + patched
+        + "\n#pragma GCC diagnostic pop\n"
     )
     write_file_if_changed(atomic_h, patched)
-    _LOGGER.info("Patched freertos/atomic.h: removed %d unused static functions.", len(removed))
+    _LOGGER.info("Patched freertos/atomic.h: removed %d unused static functions, pragma-wrapped remainder.", len(removed))
 
 
 async def to_code(configs):
