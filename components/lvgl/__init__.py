@@ -282,288 +282,8 @@ def _patch_idf_periph_ctrl() -> None:
     _LOGGER.info("Patched periph_ctrl.h to fix -Wliteral-suffix (missing space before CONFIG_IDF_TARGET).")
 
 
-def _patch_idf_freertos_atomic() -> None:
-    """Fix -Wunused-function warnings from freertos/atomic.h (IDF 5.5.x).
-
-    Removed (truly unused, -Wunused-function):
-      Atomic_Add_u32, Atomic_Subtract_u32, Atomic_Decrement_u32,
-      Atomic_OR_u32, Atomic_AND_u32, Atomic_NAND_u32, Atomic_XOR_u32
-    Kept + pragma-suppressed (used by RISC-V port.c, falsely warned):
-      Atomic_SwapPointers_p32, Atomic_CompareAndSwapPointers_p32
-    Kept without suppression (actually detected as used):
-      Atomic_CompareAndSwap_u32, Atomic_Increment_u32
-
-    Wraps the entire file with GCC diagnostic pragmas so it works on the
-    1st compile (framework-espidf is already present when to_code() runs).
-    Idempotent: sentinel string presence = already patched.
-    Specific to FreeRTOS-Kernel V10.5.1 (ESP-IDF SMP modified) as shipped
-    with IDF 5.5.x — will no-op on any version where the exact strings differ.
-    """
-    if not CORE.is_esp32:
-        return
-    try:
-        from esphome.components.esp32 import idf_version
-        from esphome.espidf.framework import _get_framework_path
-
-        ver = idf_version()
-        atomic_h = (
-            _get_framework_path(f"{ver.major}.{ver.minor}.{ver.patch}")
-            / "components"
-            / "freertos"
-            / "FreeRTOS-Kernel"
-            / "include"
-            / "freertos"
-            / "atomic.h"
-        )
-    except Exception:
-        return
-
-    if not atomic_h.is_file():
-        return
-
-    sentinel = "/* Patched by ESPHome lvgl: unused functions removed, pragma-wrapped */"
-
-    try:
-        content = atomic_h.read_text(encoding="utf-8")
-    except OSError:
-        return
-
-    if sentinel in content:
-        return  # already patched
-
-    # Exact function blocks to remove (truly unused, warned by -Wunused-function).
-    # Atomic_CompareAndSwap_u32 and Atomic_Increment_u32 are used — kept without suppression.
-    # Atomic_SwapPointers_p32 and Atomic_CompareAndSwapPointers_p32 are used by RISC-V
-    # port.c but falsely warned — kept, suppressed by the pragma wrap below.
-    blocks_to_remove = [
-        # Atomic_Add_u32
-        (
-            "/**\n"
-            " * Atomic add\n"
-            " *\n"
-            " * @brief Atomically adds count to the value of the specified pointer points to.\n"
-            " *\n"
-            " * @param[in,out] pulAddend  Pointer to memory location from where value is to be\n"
-            " *                         loaded and written back to.\n"
-            " * @param[in] ulCount      Value to be added to *pulAddend.\n"
-            " *\n"
-            " * @return previous *pulAddend value.\n"
-            " */\n"
-            "static portFORCE_INLINE uint32_t Atomic_Add_u32( uint32_t volatile * pulAddend,\n"
-            "                                                 uint32_t ulCount )\n"
-            "{\n"
-            "    uint32_t ulCurrent;\n"
-            "\n"
-            "    ATOMIC_ENTER_CRITICAL();\n"
-            "    {\n"
-            "        ulCurrent = *pulAddend;\n"
-            "        *pulAddend += ulCount;\n"
-            "    }\n"
-            "    ATOMIC_EXIT_CRITICAL();\n"
-            "\n"
-            "    return ulCurrent;\n"
-            "}\n"
-            "/*-----------------------------------------------------------*/\n"
-        ),
-        # Atomic_Subtract_u32
-        (
-            "/**\n"
-            " * Atomic subtract\n"
-            " *\n"
-            " * @brief Atomically subtracts count from the value of the specified pointer\n"
-            " *        pointers to.\n"
-            " *\n"
-            " * @param[in,out] pulAddend  Pointer to memory location from where value is to be\n"
-            " *                         loaded and written back to.\n"
-            " * @param[in] ulCount      Value to be subtract from *pulAddend.\n"
-            " *\n"
-            " * @return previous *pulAddend value.\n"
-            " */\n"
-            "static portFORCE_INLINE uint32_t Atomic_Subtract_u32( uint32_t volatile * pulAddend,\n"
-            "                                                      uint32_t ulCount )\n"
-            "{\n"
-            "    uint32_t ulCurrent;\n"
-            "\n"
-            "    ATOMIC_ENTER_CRITICAL();\n"
-            "    {\n"
-            "        ulCurrent = *pulAddend;\n"
-            "        *pulAddend -= ulCount;\n"
-            "    }\n"
-            "    ATOMIC_EXIT_CRITICAL();\n"
-            "\n"
-            "    return ulCurrent;\n"
-            "}\n"
-            "/*-----------------------------------------------------------*/\n"
-        ),
-        # Atomic_Decrement_u32
-        (
-            "/**\n"
-            " * Atomic decrement\n"
-            " *\n"
-            " * @brief Atomically decrements the value of the specified pointer points to\n"
-            " *\n"
-            " * @param[in,out] pulAddend  Pointer to memory location from where value is to be\n"
-            " *                         loaded and written back to.\n"
-            " *\n"
-            " * @return *pulAddend value before decrement.\n"
-            " */\n"
-            "static portFORCE_INLINE uint32_t Atomic_Decrement_u32( uint32_t volatile * pulAddend )\n"
-            "{\n"
-            "    uint32_t ulCurrent;\n"
-            "\n"
-            "    ATOMIC_ENTER_CRITICAL();\n"
-            "    {\n"
-            "        ulCurrent = *pulAddend;\n"
-            "        *pulAddend -= 1;\n"
-            "    }\n"
-            "    ATOMIC_EXIT_CRITICAL();\n"
-            "\n"
-            "    return ulCurrent;\n"
-            "}\n"
-        ),
-        # Atomic_OR_u32
-        (
-            "/**\n"
-            " * Atomic OR\n"
-            " *\n"
-            " * @brief Performs an atomic OR operation on the specified values.\n"
-            " *\n"
-            " * @param [in, out] pulDestination  Pointer to memory location from where value is\n"
-            " *                                to be loaded and written back to.\n"
-            " * @param [in] ulValue            Value to be ORed with *pulDestination.\n"
-            " *\n"
-            " * @return The original value of *pulDestination.\n"
-            " */\n"
-            "static portFORCE_INLINE uint32_t Atomic_OR_u32( uint32_t volatile * pulDestination,\n"
-            "                                                uint32_t ulValue )\n"
-            "{\n"
-            "    uint32_t ulCurrent;\n"
-            "\n"
-            "    ATOMIC_ENTER_CRITICAL();\n"
-            "    {\n"
-            "        ulCurrent = *pulDestination;\n"
-            "        *pulDestination |= ulValue;\n"
-            "    }\n"
-            "    ATOMIC_EXIT_CRITICAL();\n"
-            "\n"
-            "    return ulCurrent;\n"
-            "}\n"
-            "/*-----------------------------------------------------------*/\n"
-        ),
-        # Atomic_AND_u32
-        (
-            "/**\n"
-            " * Atomic AND\n"
-            " *\n"
-            " * @brief Performs an atomic AND operation on the specified values.\n"
-            " *\n"
-            " * @param [in, out] pulDestination  Pointer to memory location from where value is\n"
-            " *                                to be loaded and written back to.\n"
-            " * @param [in] ulValue            Value to be ANDed with *pulDestination.\n"
-            " *\n"
-            " * @return The original value of *pulDestination.\n"
-            " */\n"
-            "static portFORCE_INLINE uint32_t Atomic_AND_u32( uint32_t volatile * pulDestination,\n"
-            "                                                 uint32_t ulValue )\n"
-            "{\n"
-            "    uint32_t ulCurrent;\n"
-            "\n"
-            "    ATOMIC_ENTER_CRITICAL();\n"
-            "    {\n"
-            "        ulCurrent = *pulDestination;\n"
-            "        *pulDestination &= ulValue;\n"
-            "    }\n"
-            "    ATOMIC_EXIT_CRITICAL();\n"
-            "\n"
-            "    return ulCurrent;\n"
-            "}\n"
-            "/*-----------------------------------------------------------*/\n"
-        ),
-        # Atomic_NAND_u32
-        (
-            "/**\n"
-            " * Atomic NAND\n"
-            " *\n"
-            " * @brief Performs an atomic NAND operation on the specified values.\n"
-            " *\n"
-            " * @param [in, out] pulDestination  Pointer to memory location from where value is\n"
-            " *                                to be loaded and written back to.\n"
-            " * @param [in] ulValue            Value to be NANDed with *pulDestination.\n"
-            " *\n"
-            " * @return The original value of *pulDestination.\n"
-            " */\n"
-            "static portFORCE_INLINE uint32_t Atomic_NAND_u32( uint32_t volatile * pulDestination,\n"
-            "                                                  uint32_t ulValue )\n"
-            "{\n"
-            "    uint32_t ulCurrent;\n"
-            "\n"
-            "    ATOMIC_ENTER_CRITICAL();\n"
-            "    {\n"
-            "        ulCurrent = *pulDestination;\n"
-            "        *pulDestination = ~( ulCurrent & ulValue );\n"
-            "    }\n"
-            "    ATOMIC_EXIT_CRITICAL();\n"
-            "\n"
-            "    return ulCurrent;\n"
-            "}\n"
-            "/*-----------------------------------------------------------*/\n"
-        ),
-        # Atomic_XOR_u32
-        (
-            "/**\n"
-            " * Atomic XOR\n"
-            " *\n"
-            " * @brief Performs an atomic XOR operation on the specified values.\n"
-            " *\n"
-            " * @param [in, out] pulDestination  Pointer to memory location from where value is\n"
-            " *                                to be loaded and written back to.\n"
-            " * @param [in] ulValue            Value to be XORed with *pulDestination.\n"
-            " *\n"
-            " * @return The original value of *pulDestination.\n"
-            " */\n"
-            "static portFORCE_INLINE uint32_t Atomic_XOR_u32( uint32_t volatile * pulDestination,\n"
-            "                                                 uint32_t ulValue )\n"
-            "{\n"
-            "    uint32_t ulCurrent;\n"
-            "\n"
-            "    ATOMIC_ENTER_CRITICAL();\n"
-            "    {\n"
-            "        ulCurrent = *pulDestination;\n"
-            "        *pulDestination ^= ulValue;\n"
-            "    }\n"
-            "    ATOMIC_EXIT_CRITICAL();\n"
-            "\n"
-            "    return ulCurrent;\n"
-            "}\n"
-        ),
-    ]
-
-    patched = content
-    removed = []
-    for block in blocks_to_remove:
-        if block in patched:
-            patched = patched.replace(block, "")
-            removed.append(block.split("\n")[2].strip(" *"))  # extract @brief line
-
-    if not removed:
-        return  # nothing matched — different IDF version, leave untouched
-
-    # Wrap entire file with GCC diagnostic pragmas so the 2 pointer functions
-    # (kept but falsely warned) are suppressed from the very first compile.
-    patched = (
-        f"{sentinel}\n"
-        "#pragma GCC diagnostic push\n"
-        "#pragma GCC diagnostic ignored \"-Wunused-function\"\n"
-        + patched
-        + "\n#pragma GCC diagnostic pop\n"
-    )
-    write_file_if_changed(atomic_h, patched)
-    _LOGGER.info("Patched freertos/atomic.h: removed %d unused static functions, pragma-wrapped remainder.", len(removed))
-
-
 async def to_code(configs):
     _patch_idf_periph_ctrl()
-    _patch_idf_freertos_atomic()
     config_0 = configs[0]
     # Global configuration
     cg.add_library("lvgl/lvgl", "9.5.0")
@@ -945,12 +665,16 @@ async def to_code(configs):
     # has downloaded the files and before ninja compilation starts.
     component_dir = Path(__file__).parent
     patch_src = component_dir / "lv_freertos_psram.c.inc"
+    atomic_patch_src = component_dir / "atomic_h_patch.py.inc"
     if patch_src.is_file() and CORE.build_path:
         dst_patch = CORE.relative_src_path("lv_freertos_patch.inc")
         shutil.copy2(patch_src, dst_patch)
+        dst_atomic_patch = CORE.relative_src_path("atomic_h_patch.py.inc")
+        if atomic_patch_src.is_file():
+            shutil.copy2(atomic_patch_src, dst_atomic_patch)
         cmake_content = (
-            "# Auto-generated by lvgl component — patch lv_freertos.c in pio_components\n"
-            "# at cmake configure time so atomic.h resolves correctly on ESP-IDF builds.\n"
+            "# Auto-generated by lvgl component — patch lv_freertos.c and freertos/atomic.h\n"
+            "# at cmake configure time, before ninja compilation starts.\n"
             "file(GLOB _lv_freertos_targets\n"
             f'    "{CORE.relative_internal_path("pio_components").as_posix()}'
             "/*/lvgl/lvgl/src/osal/lv_freertos.c\"\n"
@@ -959,6 +683,19 @@ async def to_code(configs):
             f'    configure_file("{dst_patch.as_posix()}" "${{_target}}" COPYONLY)\n'
             "endforeach()\n"
         )
+        if atomic_patch_src.is_file():
+            # Find freertos/atomic.h in the IDF framework and patch it via Python.
+            # Uses find_program to locate python3 in the IDF venv or system PATH.
+            cmake_content += (
+                "find_program(_python3 python3 REQUIRED)\n"
+                "file(GLOB _atomic_h_candidates\n"
+                '    "$ENV{IDF_PATH}/components/freertos/FreeRTOS-Kernel/include/freertos/atomic.h"\n'
+                '    "$ENV{IDF_PATH}/components/freertos/FreeRTOS-Kernel-SMP/include/freertos/atomic.h"\n'
+                ")\n"
+                "foreach(_atomic_h IN LISTS _atomic_h_candidates)\n"
+                f'    execute_process(COMMAND "${{_python3}}" "{dst_atomic_patch.as_posix()}" "${{_atomic_h}}")\n'
+                "endforeach()\n"
+            )
         write_file_if_changed(
             CORE.relative_src_path("project_include.cmake"),
             cmake_content,
