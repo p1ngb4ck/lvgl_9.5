@@ -18,7 +18,7 @@ atomic_h = Path(sys.argv[1])
 if not atomic_h.is_file():
     sys.exit(0)
 
-sentinel = "/* Patched by ESPHome lvgl: unused functions removed */"
+sentinel = "/* Patched by ESPHome lvgl: unused functions removed + pragma-wrapped v2 */"
 
 content = atomic_h.read_text(encoding="utf-8")
 
