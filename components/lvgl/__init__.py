@@ -285,9 +285,12 @@ def _patch_idf_periph_ctrl() -> None:
 def _patch_idf_freertos_atomic() -> None:
     """Remove unused static functions from freertos/atomic.h (IDF 5.5.x).
 
-    The functions Atomic_CompareAndSwap_u32 and Atomic_Increment_u32 are used
-    and kept. The remaining 9 static inline functions are unused in our build
-    and are removed to eliminate -Wunused-function warnings.
+    Kept (actually used):
+      Atomic_CompareAndSwap_u32, Atomic_Increment_u32,
+      Atomic_SwapPointers_p32, Atomic_CompareAndSwapPointers_p32
+    Removed (unused, warned by -Wunused-function):
+      Atomic_Add_u32, Atomic_Subtract_u32, Atomic_Decrement_u32,
+      Atomic_OR_u32, Atomic_AND_u32, Atomic_NAND_u32, Atomic_XOR_u32
     Idempotent: sentinel string presence = already patched.
     Specific to FreeRTOS-Kernel V10.5.1 (ESP-IDF SMP modified) as shipped
     with IDF 5.5.x — will no-op on any version where the exact strings differ.
@@ -327,75 +330,6 @@ def _patch_idf_freertos_atomic() -> None:
     # Exact function blocks to remove (unused, warned by -Wunused-function).
     # Atomic_CompareAndSwap_u32 and Atomic_Increment_u32 are used — kept.
     blocks_to_remove = [
-        # Atomic_SwapPointers_p32
-        (
-            "/**\n"
-            " * Atomic swap (pointers)\n"
-            " *\n"
-            " * @brief Atomically sets the address pointed to by *ppvDestination to the value\n"
-            " *        of *pvExchange.\n"
-            " *\n"
-            " * @param[in, out] ppvDestination  Pointer to memory location from where a pointer\n"
-            " *                                 value is to be loaded and written back to.\n"
-            " * @param[in] pvExchange           Pointer value to be written to *ppvDestination.\n"
-            " *\n"
-            " * @return The initial value of *ppvDestination.\n"
-            " */\n"
-            "static portFORCE_INLINE void * Atomic_SwapPointers_p32( void * volatile * ppvDestination,\n"
-            "                                                        void * pvExchange )\n"
-            "{\n"
-            "    void * pReturnValue;\n"
-            "\n"
-            "    ATOMIC_ENTER_CRITICAL();\n"
-            "    {\n"
-            "        pReturnValue = *ppvDestination;\n"
-            "        *ppvDestination = pvExchange;\n"
-            "    }\n"
-            "    ATOMIC_EXIT_CRITICAL();\n"
-            "\n"
-            "    return pReturnValue;\n"
-            "}\n"
-            "/*-----------------------------------------------------------*/\n"
-        ),
-        # Atomic_CompareAndSwapPointers_p32
-        (
-            "/**\n"
-            " * Atomic compare-and-swap (pointers)\n"
-            " *\n"
-            " * @brief Performs an atomic compare-and-swap operation on the specified pointer\n"
-            " *        values.\n"
-            " *\n"
-            " * @param[in, out] ppvDestination  Pointer to memory location from where a pointer\n"
-            " *                                 value is to be loaded and checked.\n"
-            " * @param[in] pvExchange           If condition meets, write this value to memory.\n"
-            " * @param[in] pvComparand          Swap condition.\n"
-            " *\n"
-            " * @return Unsigned integer of value 1 or 0. 1 for swapped, 0 for not swapped.\n"
-            " *\n"
-            " * @note This function only swaps *ppvDestination with pvExchange, if previous\n"
-            " *       *ppvDestination value equals pvComparand.\n"
-            " */\n"
-            "static portFORCE_INLINE uint32_t Atomic_CompareAndSwapPointers_p32( void * volatile * ppvDestination,\n"
-            "                                                                    void * pvExchange,\n"
-            "                                                                    void * pvComparand )\n"
-            "{\n"
-            "    uint32_t ulReturnValue = ATOMIC_COMPARE_AND_SWAP_FAILURE;\n"
-            "\n"
-            "    ATOMIC_ENTER_CRITICAL();\n"
-            "    {\n"
-            "        if( *ppvDestination == pvComparand )\n"
-            "        {\n"
-            "            *ppvDestination = pvExchange;\n"
-            "            ulReturnValue = ATOMIC_COMPARE_AND_SWAP_SUCCESS;\n"
-            "        }\n"
-            "    }\n"
-            "    ATOMIC_EXIT_CRITICAL();\n"
-            "\n"
-            "    return ulReturnValue;\n"
-            "}\n"
-            "\n"
-            "\n"
-        ),
         # Atomic_Add_u32
         (
             "/**\n"
