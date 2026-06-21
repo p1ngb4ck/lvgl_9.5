@@ -622,7 +622,7 @@ async def to_code(configs):
     async def _patch_lv_freertos():
         if not CORE.build_path or not patch_src.is_file():
             return
-        pio_components_dir = Path(CORE.build_path).parent.parent / "pio_components"
+        pio_components_dir = CORE.relative_internal_path("pio_components")
         if pio_components_dir.is_dir():
             for target in pio_components_dir.glob("*/lvgl/lvgl/src/osal/lv_freertos.c"):
                 shutil.copy2(patch_src, target)
