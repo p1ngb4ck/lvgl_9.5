@@ -68,7 +68,7 @@ static fps_ctx_t s_ctx;
 static void fps_refr_ready_cb(lv_event_t *e)
 {
     (void)e;
-    s_ctx.frame_counter++;
+    s_ctx.frame_counter = s_ctx.frame_counter + 1;
 }
 
 static int compare_uint32(const void *a, const void *b)
