@@ -1063,8 +1063,9 @@ void LvglComponent::setup() {
   lv_display_set_buffers(this->disp_, this->draw_buf_, buf2, this->buf_bytes_,
                          this->full_refresh_ ? LV_DISPLAY_RENDER_MODE_FULL : LV_DISPLAY_RENDER_MODE_PARTIAL);
   this->buffers_configured_ = true;
-  this->show_page(0, LV_SCR_LOAD_ANIM_NONE, 0);
-  lv_display_trigger_activity(this->disp_);
+  // show_page(0) is deferred to the first loop() call so the draw thread
+  // has time to start and enter its wait state before lv_screen_load()
+  // is called — avoids a deadlock under IDF 6.x SMP FreeRTOS scheduling.
 
 #if defined(USE_LVGL_PPA) && (LV_USE_OS == LV_OS_NONE)
   // Espressif esp-iot-solution PPA SW blend handler — accelerates RGB565
@@ -1102,6 +1103,8 @@ void LvglComponent::loop() {
 
   if (!this->loop_started_) {
     this->loop_started_ = true;
+    this->show_page(0, LV_SCR_LOAD_ANIM_NONE, 0);
+    lv_display_trigger_activity(this->disp_);
     ESP_LOGD(TAG, "LVGL loop started - system is now fully ready");
   }
 
