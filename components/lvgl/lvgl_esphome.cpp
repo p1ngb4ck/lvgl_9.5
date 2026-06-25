@@ -1129,9 +1129,7 @@ void LvglComponent::loop() {
     // counts only real render work (matches lvgl_camera_display's
     // approach: cpu_time / frame_interval).
     uint64_t t0 = lvgl_now_us();
-    lv_lock();
     lv_timer_handler();
-    lv_unlock();
     uint64_t t1 = lvgl_now_us();
     this->perf_busy_us_ += (t1 - t0);
     uint64_t now_us = t1;
