@@ -286,13 +286,10 @@ async def to_code(configs):
     _patch_idf_periph_ctrl()
     config_0 = configs[0]
     # Global configuration
-    cg.add_library("lvgl/lvgl", "9.5.0")
-    cg.add_define("USE_LVGL")
+    from esphome.components.esp32 import add_idf_component
 
-    # Add build filter to exclude LVGL platform code not needed for ESP32
-    # This reduces compilation time and binary size significantly
-    build_filter_script = Path(__file__).parent / "lvgl_build_filter.py"
-    cg.add_platformio_option("extra_scripts", [f"pre:{build_filter_script}"])
+    add_idf_component(name="lvgl/lvgl", ref="9.5.0")
+    cg.add_define("USE_LVGL")
 
     # Define ESPHOME_ENTITY_BUTTON_COUNT for ESPHome core compatibility
     # application.h requires this symbol even when no button entities exist.
@@ -622,7 +619,11 @@ async def to_code(configs):
         # Large stack for ThorVG rendering
         df.add_define("LV_DRAW_THREAD_STACK_SIZE", "(48 * 1024)")
         # pngdec only needed for ThorVG image pipeline
-        cg.add_library("pngdec", "1.0.1")
+        add_idf_component(
+            name="pngdec",
+            repo="https://github.com/bitbank2/PNGdec.git",
+            ref="1.0.1",
+        )
         # Signal to lvgl_build_filter.py to compile ThorVG sources
         cg.add_build_flag("-DLVGL_USE_THORVG=1")
         df.LOGGER.info("ThorVG enabled (SVG/Lottie widgets detected)")
@@ -658,47 +659,205 @@ async def to_code(configs):
     write_file_if_changed(lv_conf_h_file, generate_lv_conf_h())
     cg.add_build_flag("-DLV_CONF_H=1")
     cg.add_build_flag(f'-DLV_CONF_PATH=\\"{Path(lv_conf_h_file).as_posix()}\\"')
-    # Copy lv_freertos_psram.c.inc to src/ so cmake can reference it.
-    # .inc extension survives copy_src_tree cleanup (not in SOURCE_FILE_EXTENSIONS).
-    # Then write src/project_include.cmake to patch lv_freertos.c in pio_components
-    # at cmake configure time — guaranteed to run after generate_idf_components()
-    # has downloaded the files and before ninja compilation starts.
-    component_dir = Path(__file__).parent
-    patch_src = component_dir / "lv_freertos_psram.c.inc"
-    atomic_patch_src = component_dir / "atomic_h_patch.py.inc"
-    if patch_src.is_file() and CORE.build_path:
+
+    if CORE.build_path:
+        component_dir = Path(__file__).parent
+        patch_src = component_dir / "lv_freertos_psram.c.inc"
+        atomic_patch_src = component_dir / "atomic_h_patch.py.inc"
+
         dst_patch = CORE.relative_src_path("lv_freertos_patch.inc")
-        shutil.copy2(patch_src, dst_patch)
+        if patch_src.is_file():
+            shutil.copy2(patch_src, dst_patch)
+
         dst_atomic_patch = CORE.relative_src_path("atomic_h_patch.py.inc")
         if atomic_patch_src.is_file():
             shutil.copy2(atomic_patch_src, dst_atomic_patch)
-        pio_components_dir = CORE.relative_internal_path("pio_components").as_posix()
+
+        # managed_components/lvgl__lvgl — IDF component manager places lvgl/lvgl here.
+        # The target name used by IDF cmake is __idf_lvgl__lvgl (owner__name).
+        managed_lvgl_dir = (Path(CORE.build_path) / "managed_components" / "lvgl__lvgl").as_posix()
+        lv_freertos_dst = f"{managed_lvgl_dir}/src/osal/lv_freertos.c"
+
+        # Build the list of source path patterns to exclude from __idf_lvgl__lvgl.
+        # These mirror the exclusions in lvgl_build_filter.py but expressed as
+        # cmake regex patterns applied to the SOURCES list of the IDF target.
+        excluded_patterns = [
+            # Draw backends not available on ESP32
+            "/draw/nanovg/",
+            "/draw/nema_gfx/",
+            "/draw/nxp/",
+            "/draw/renesas/",
+            "/draw/eve/",
+            "/draw/vg_lite/",
+            "/draw/dma2d/",
+            "/draw/sdl/",
+            "/draw/opengles/",
+            # Display/input drivers not for ESP32
+            "/drivers/wayland/",
+            "/drivers/x11/",
+            "/drivers/windows/",
+            "/drivers/sdl/",
+            "/drivers/nuttx/",
+            "/drivers/qnx/",
+            "/drivers/uefi/",
+            "/drivers/opengles/",
+            "/drivers/draw/eve/",
+            "/drivers/display/drm/",
+            "/drivers/display/fb/",
+            "/drivers/display/ft81x/",
+            "/drivers/display/lovyan_gfx/",
+            "/drivers/display/nxp_elcdif/",
+            "/drivers/display/renesas_glcdc/",
+            "/drivers/display/st_ltdc/",
+            "/drivers/display/tft_espi/",
+            "/drivers/display/nv3007/",
+            "/drivers/libinput/",
+            "/drivers/evdev/",
+            # Libraries not needed on ESP32
+            "/libs/gltf/",
+            "/libs/nanovg/",
+            "/libs/ffmpeg/",
+            "/libs/freetype/",
+            "/libs/rlottie/",
+            "/libs/libpng/",
+            "/libs/libjpeg_turbo/",
+            "/libs/libwebp/",
+            "/libs/frogfs/",
+            "/libs/vg_lite_driver/",
+            "/libs/FT800-FT813/",
+            "/libs/fsdrv/lv_fs_win32.",
+            "/libs/fsdrv/lv_fs_uefi.",
+            "/libs/fsdrv/lv_fs_stdio.",
+            "/libs/fsdrv/lv_fs_arduino_sd.",
+            "/libs/fsdrv/lv_fs_arduino_esp_littlefs.",
+            "/libs/fsdrv/lv_fs_frogfs.",
+            "/libs/fsdrv/lv_fs_littlefs.",
+            # OS abstraction layers not for ESP32 (uses FreeRTOS)
+            "/osal/lv_linux.",
+            "/osal/lv_windows.",
+            "/osal/lv_sdl2.",
+            "/osal/lv_pthread.",
+            "/osal/lv_cmsis_rtos2.",
+            "/osal/lv_mqx.",
+            "/osal/lv_rtthread.",
+            # stdlib not for ESP32
+            "/stdlib/micropython/",
+            "/stdlib/rtthread/",
+            "/stdlib/uefi/",
+            # Debug/test files
+            "/debugging/monkey/",
+            "/debugging/test/",
+            "/debugging/vg_lite_tvg/",
+            # ARM Helium (MVE) assembly — invalid on RISC-V/Xtensa
+            "/helium/lv_blend_helium.S",
+        ]
+
+        # Conditionally exclude ThorVG/SVG/Lottie when not needed
+        if not needs_thorvg:
+            excluded_patterns += [
+                "/libs/thorvg/",
+                "/libs/lottie/",
+                "/libs/svg/",
+                "/draw/lv_draw_vector.",
+                "/draw/sw/lv_draw_sw_vector.",
+            ]
+
+        # Conditionally exclude QR code
+        if "qrcode" not in helpers.lv_uses:
+            excluded_patterns.append("/libs/qrcode/")
+
+        # Conditionally exclude GIF/BMP image decoders
+        if not (
+            "image" in helpers.lv_uses
+            or "img" in helpers.lv_uses
+            or "animimg" in helpers.lv_uses
+        ):
+            excluded_patterns += ["/libs/gif/", "/libs/bmp/"]
+
+        # Conditionally exclude sysmon
+        _sysmon_enabled = use_perf_monitor
+        if not _sysmon_enabled:
+            excluded_patterns.append("/debugging/sysmon/lv_sysmon.")
+
+        # Build widget exclusion set: exclude widget source files for widgets not in use
+        _WIDGET_FILES = {
+            "animimage": {"animimg", "animimage"},
+            "arc": {"arc"},
+            "bar": {"bar"},
+            "button": {"button", "btn"},
+            "buttonmatrix": {"buttonmatrix", "btnmatrix"},
+            "calendar": {"calendar"},
+            "canvas": {"canvas"},
+            "chart": {"chart"},
+            "checkbox": {"checkbox"},
+            "dropdown": {"dropdown"},
+            "image": {"image", "img"},
+            "imagebutton": {"imgbtn", "imagebutton"},
+            "keyboard": {"keyboard"},
+            "label": {"label"},
+            "led": {"led"},
+            "line": {"line"},
+            "list": {"list"},
+            "lottie": {"lottie"},
+            "menu": {"menu"},
+            "msgbox": {"msgbox"},
+            "roller": {"roller"},
+            "scale": {"scale", "meter"},
+            "slider": {"slider"},
+            "span": {"span", "spangroup"},
+            "spinbox": {"spinbox"},
+            "spinner": {"spinner"},
+            "switch": {"switch"},
+            "table": {"table"},
+            "tabview": {"tabview"},
+            "textarea": {"textarea"},
+            "tileview": {"tileview"},
+            "win": {"win"},
+        }
+        lv_uses_lower = {u.lower() for u in helpers.lv_uses}
+        excluded_widget_files = [
+            f"/widgets/{wf}"
+            for wf, use_names in _WIDGET_FILES.items()
+            if not (use_names & lv_uses_lower)
+        ]
+
+        # Convert plain-string patterns to cmake regex (escape dots, treat as substring)
+        def _to_cmake_regex(pattern: str) -> str:
+            # Escape regex metacharacters except / which is fine as-is
+            escaped = pattern.replace(".", "\\\\.")
+            return escaped
+
+        all_patterns = [_to_cmake_regex(p) for p in excluded_patterns]
+        all_patterns += [_to_cmake_regex(p) for p in excluded_widget_files]
+
+        # Build the cmake FILTER lines for the deferred block
+        filter_lines = "\n".join(
+            f'    list(FILTER _lvgl_srcs EXCLUDE REGEX "{p}")'
+            for p in all_patterns
+        )
+
         cmake_content = (
-            "# Auto-generated by lvgl component — patch lv_freertos.c and freertos/atomic.h\n"
-            "# at cmake configure time, before ninja compilation starts.\n"
-            "file(GLOB _lv_freertos_targets\n"
-            f'    "{pio_components_dir}/*/lvgl/lvgl/src/osal/lv_freertos.c"\n'
-            ")\n"
-            "message(STATUS \"lvgl patch: searching ${_lv_freertos_targets} (pio_components: "
-            f'{pio_components_dir})")\n'
-            "foreach(_target IN LISTS _lv_freertos_targets)\n"
-            f'    configure_file("{dst_patch.as_posix()}" "${{_target}}" COPYONLY)\n'
-            '    message(STATUS "lvgl patch: patched ${_target}")\n'
-            "endforeach()\n"
-            # lv_blend_helium.S is ARM Helium (MVE) assembly, invalid on RISC-V/Xtensa.
-            # Remove it from the __idf_lvgl target's SOURCES after idf_component_register
-            # has run (deferred so the target exists by the time this executes).
+            "# Auto-generated by lvgl component\n"
+            "# Patch lv_freertos.c with PSRAM-aware version before ninja compiles it.\n"
+        )
+        if patch_src.is_file():
+            cmake_content += (
+                f'configure_file("{dst_patch.as_posix()}" "{lv_freertos_dst}" COPYONLY)\n'
+            )
+
+        # Deferred: remove excluded sources from __idf_lvgl__lvgl after idf_component_register
+        cmake_content += (
             'cmake_language(DEFER CALL cmake_language EVAL CODE [=[\n'
-            '  if(TARGET __idf_lvgl)\n'
-            '    get_target_property(_lvgl_srcs __idf_lvgl SOURCES)\n'
-            '    list(FILTER _lvgl_srcs EXCLUDE REGEX "helium/lv_blend_helium\\\\.S$")\n'
-            '    set_target_properties(__idf_lvgl PROPERTIES SOURCES "${_lvgl_srcs}")\n'
+            '  if(TARGET __idf_lvgl__lvgl)\n'
+            '    get_target_property(_lvgl_srcs __idf_lvgl__lvgl SOURCES)\n'
+            f'{filter_lines}\n'
+            '    set_target_properties(__idf_lvgl__lvgl PROPERTIES SOURCES "${_lvgl_srcs}")\n'
             '  endif()\n'
             ']=])\n'
         )
+
+        # atomic.h patch
         if atomic_patch_src.is_file():
-            # Resolve atomic.h paths in Python where IDF path is known, pass
-            # absolute paths directly into cmake to avoid $ENV{IDF_PATH} issues.
             atomic_h_paths = []
             try:
                 from esphome.components.esp32 import idf_version
@@ -728,6 +887,7 @@ async def to_code(configs):
                         f' "{dst_atomic_patch.as_posix()}"'
                         f' "{atomic_h_path.as_posix()}")\n'
                     )
+
         write_file_if_changed(
             CORE.relative_src_path("project_include.cmake"),
             cmake_content,
