@@ -682,6 +682,16 @@ async def to_code(configs):
             "foreach(_target IN LISTS _lv_freertos_targets)\n"
             f'    configure_file("{dst_patch.as_posix()}" "${{_target}}" COPYONLY)\n'
             "endforeach()\n"
+            # lv_blend_helium.S is ARM Helium (MVE) assembly, invalid on RISC-V/Xtensa.
+            # Remove it from the __idf_lvgl target's SOURCES after idf_component_register
+            # has run (deferred so the target exists by the time this executes).
+            'cmake_language(DEFER CALL cmake_language EVAL CODE [=[\n'
+            '  if(TARGET __idf_lvgl)\n'
+            '    get_target_property(_lvgl_srcs __idf_lvgl SOURCES)\n'
+            '    list(FILTER _lvgl_srcs EXCLUDE REGEX "helium/lv_blend_helium\\\\.S$")\n'
+            '    set_target_properties(__idf_lvgl PROPERTIES SOURCES "${_lvgl_srcs}")\n'
+            '  endif()\n'
+            ']=])\n'
         )
         if atomic_patch_src.is_file():
             # Resolve atomic.h paths in Python where IDF path is known, pass
