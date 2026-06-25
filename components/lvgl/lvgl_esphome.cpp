@@ -1056,13 +1056,8 @@ void LvglComponent::setup() {
   // Rotation will be handled by our drawing function, so reset the display rotation.
   for (auto *disp : this->displays_)
     disp->set_rotation(display::DISPLAY_ROTATION_0_DEGREES);
-  this->show_page(0, LV_SCR_LOAD_ANIM_NONE, 0);
-  lv_display_trigger_activity(this->disp_);
-
-  // CRITICAL: Configure buffers at the VERY END of setup()
-  // This avoids deadlock while ensuring buffers are ready before any callbacks execute
-  // When pipelined flush is active, pass the second buffer so LVGL double-buffers
-  // (render next frame while the flush task rotates+pushes the current one).
+  // CRITICAL: Configure buffers before show_page() — with LV_OS_FREERTOS the
+  // draw thread starts immediately on lv_screen_load(); buffers must exist first.
   void *buf2 = nullptr;
 #ifdef USE_LVGL_PPA
   buf2 = this->draw_buf2_;
@@ -1070,6 +1065,8 @@ void LvglComponent::setup() {
   lv_display_set_buffers(this->disp_, this->draw_buf_, buf2, this->buf_bytes_,
                          this->full_refresh_ ? LV_DISPLAY_RENDER_MODE_FULL : LV_DISPLAY_RENDER_MODE_PARTIAL);
   this->buffers_configured_ = true;
+  this->show_page(0, LV_SCR_LOAD_ANIM_NONE, 0);
+  lv_display_trigger_activity(this->disp_);
 
 #if defined(USE_LVGL_PPA) && (LV_USE_OS == LV_OS_NONE)
   // Espressif esp-iot-solution PPA SW blend handler — accelerates RGB565
