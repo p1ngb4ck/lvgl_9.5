@@ -473,22 +473,26 @@ static void prvMutexInit(lv_mutex_t * pxMutex)
 
 static void prvCheckMutexInit(lv_mutex_t * pxMutex)
 {
-    /* Check if the mutex needs to be initialized. */
-    if(pxMutex->xIsInitialized == pdFALSE) {
-        /* Mutex initialization must be in a critical section to prevent two threads
-         * from initializing it at the same time. */
-        _enter_critical();
+    if(pxMutex->xIsInitialized != pdFALSE) return;
 
-        /* Check again that the mutex is still uninitialized, i.e. it wasn't
-         * initialized while this function was waiting to enter the critical
-         * section. */
-        if(pxMutex->xIsInitialized == pdFALSE) {
-            prvMutexInit(pxMutex);
-        }
-
-        /* Exit the critical section. */
-        _exit_critical();
+    /* Pre-allocate outside any critical section — heap calls are illegal
+     * inside taskENTER_CRITICAL on IDF 6.x SMP. */
+    SemaphoreHandle_t xNew = xSemaphoreCreateRecursiveMutex();
+    if(xNew == NULL) {
+        LV_LOG_ERROR("xSemaphoreCreateMutex failed!");
+        return;
     }
+
+    /* Install atomically; discard if another core beat us to it. */
+    _enter_critical();
+    if(pxMutex->xIsInitialized == pdFALSE) {
+        pxMutex->xMutex = xNew;
+        pxMutex->xIsInitialized = pdTRUE;
+        xNew = NULL;
+    }
+    _exit_critical();
+
+    if(xNew != NULL) vSemaphoreDelete(xNew);
 }
 
 static void prvCondInit(lv_thread_sync_t * pxCond)
@@ -524,42 +528,50 @@ static void prvCondInit(lv_thread_sync_t * pxCond)
 
 static void prvCheckCondInit(lv_thread_sync_t * pxCond)
 {
-    /* Check if the condition variable needs to be initialized. */
-    if(pxCond->xIsInitialized == pdFALSE) {
-        /* Cond initialization must be in a critical section to prevent two
-         * threads from initializing it at the same time. */
-        _enter_critical();
+    if(pxCond->xIsInitialized != pdFALSE) return;
 
-        /* Check again that the condition is still uninitialized, i.e. it wasn't
-         * initialized while this function was waiting to enter the critical
-         * section. */
-        if(pxCond->xIsInitialized == pdFALSE) {
-            prvCondInit(pxCond);
-        }
-
-        /* Exit the critical section. */
-        _exit_critical();
+#if !LV_USE_FREERTOS_TASK_NOTIFY
+    /* Pre-allocate outside any critical section — heap calls are illegal
+     * inside taskENTER_CRITICAL on IDF 6.x SMP. */
+    SemaphoreHandle_t xNewSem = xSemaphoreCreateCounting(ulMAX_COUNT, 0U);
+    SemaphoreHandle_t xNewMtx = (xNewSem != NULL) ? xSemaphoreCreateMutex() : NULL;
+    if(xNewSem == NULL || xNewMtx == NULL) {
+        LV_LOG_ERROR("xSemaphoreCreate failed during cond init!");
+        if(xNewSem != NULL) vSemaphoreDelete(xNewSem);
+        if(xNewMtx != NULL) vSemaphoreDelete(xNewMtx);
+        return;
     }
+#endif
+
+    /* Install atomically; discard if another core beat us to it. */
+    _enter_critical();
+    if(pxCond->xIsInitialized == pdFALSE) {
+        pxCond->xSyncSignal = pdFALSE;
+#if LV_USE_FREERTOS_TASK_NOTIFY
+        pxCond->xTaskToNotify = NULL;
+#else
+        pxCond->xCondWaitSemaphore = xNewSem;
+        pxCond->xSyncMutex = xNewMtx;
+        pxCond->ulWaitingThreads = 0;
+        xNewSem = NULL;
+        xNewMtx = NULL;
+#endif
+        pxCond->xIsInitialized = pdTRUE;
+    }
+    _exit_critical();
+
+#if !LV_USE_FREERTOS_TASK_NOTIFY
+    if(xNewSem != NULL) vSemaphoreDelete(xNewSem);
+    if(xNewMtx != NULL) vSemaphoreDelete(xNewMtx);
+#endif
 }
 
 static void prvCheckCondInitIsr(lv_thread_sync_t * pxCond)
 {
-    /* Check if the condition variable needs to be initialized. */
-    if(pxCond->xIsInitialized == pdFALSE) {
-        /* Cond initialization must be in a critical section to prevent two
-         * threads from initializing it at the same time. */
-        uint32_t mask = _enter_critical_isr();
-
-        /* Check again that the condition is still uninitialized, i.e. it wasn't
-         * initialized while this function was waiting to enter the critical
-         * section. */
-        if(pxCond->xIsInitialized == pdFALSE) {
-            prvCondInit(pxCond);
-        }
-
-        /* Exit the critical section. */
-        _exit_critical_isr(mask);
-    }
+    /* ISR context: cannot allocate. Cond must have been initialized by task
+     * context before lv_thread_sync_signal_isr() is called. */
+    LV_ASSERT_MSG(pxCond->xIsInitialized != pdFALSE,
+                  "lv_thread_sync_signal_isr called before lv_thread_sync_init");
 }
 
 #if !LV_USE_FREERTOS_TASK_NOTIFY
