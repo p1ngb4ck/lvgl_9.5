@@ -682,6 +682,9 @@ async def to_code(configs):
         # These mirror the exclusions in lvgl_build_filter.py but expressed as
         # cmake regex patterns applied to the SOURCES list of the IDF target.
         excluded_patterns = [
+            # Examples and demos — never compile
+            "/examples/",
+            "/demos/",
             # Draw backends not available on ESP32
             "/draw/nanovg/",
             "/draw/nema_gfx/",
