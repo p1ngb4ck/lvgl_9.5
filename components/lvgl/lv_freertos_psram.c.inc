@@ -37,10 +37,6 @@
 #include "../misc/lv_log.h"
 #include "../core/lv_global.h"
 
-#ifdef ESP_PLATFORM
-#include "esp_heap_caps.h"
-#include "freertos/idf_additions.h"
-#endif
 
 /*********************
  *      DEFINES
@@ -113,31 +109,6 @@ lv_result_t lv_thread_init(lv_thread_t * pxThread,  const char * const name,
 
     BaseType_t xTaskCreateStatus;
 
-#ifdef ESP_PLATFORM
-    /* Try to allocate the draw-thread stack from PSRAM first so we don't
-     * exhaust internal SRAM.  xTaskCreateWithCaps() is an ESP-IDF extension
-     * (freertos/idf_additions.h) that accepts heap capability flags. */
-    xTaskCreateStatus = xTaskCreateWithCaps(
-                            prvRunThread,
-                            name,
-                            (configSTACK_DEPTH_TYPE)(usStackSize / sizeof(StackType_t)),
-                            (void *)pxThread,
-                            tskIDLE_PRIORITY + xSchedPriority,
-                            &pxThread->xTaskHandle,
-                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-
-    if(xTaskCreateStatus != pdPASS) {
-        /* PSRAM unavailable or full — fall back to internal SRAM. */
-        LV_LOG_WARN("xTaskCreateWithCaps(SPIRAM) failed, retrying in SRAM");
-        xTaskCreateStatus = xTaskCreate(
-                                prvRunThread,
-                                name,
-                                (configSTACK_DEPTH_TYPE)(usStackSize / sizeof(StackType_t)),
-                                (void *)pxThread,
-                                tskIDLE_PRIORITY + xSchedPriority,
-                                &pxThread->xTaskHandle);
-    }
-#else
     xTaskCreateStatus = xTaskCreate(
                             prvRunThread,
                             name,
@@ -145,7 +116,6 @@ lv_result_t lv_thread_init(lv_thread_t * pxThread,  const char * const name,
                             (void *)pxThread,
                             tskIDLE_PRIORITY + xSchedPriority,
                             &pxThread->xTaskHandle);
-#endif
 
     /* Ensure that the FreeRTOS task was successfully created. */
     if(xTaskCreateStatus != pdPASS) {
