@@ -82,6 +82,26 @@ static void prvCondInit(lv_thread_sync_t *pxCond);
 static void prvCheckCondInit(lv_thread_sync_t *pxCond);
 static void prvCheckCondInitIsr(lv_thread_sync_t *pxCond);
 
+#ifdef ESP_PLATFORM
+/* Bootstrap wrapper: carries real thread ptr + a semaphore that lv_thread_init
+ * blocks on until the new task has executed its first instruction.  Ensures
+ * thread_dsc->inited is set before the first dispatch() call on SMP targets
+ * where taskYIELD() only yields the calling core. */
+typedef struct {
+    lv_thread_t       *pxThread;
+    SemaphoreHandle_t  xReadySem;
+} lv_thread_boot_t;
+
+static void prvRunThreadSmp(void *pxArg)
+{
+    lv_thread_boot_t boot = *(lv_thread_boot_t *)pxArg;
+    lv_free(pxArg);
+    xSemaphoreGive(boot.xReadySem);   /* unblock lv_thread_init */
+    boot.pxThread->pvStartRoutine((void *)boot.pxThread->pTaskArg);
+    vTaskDelete(NULL);
+}
+#endif
+
 #if !LV_USE_FREERTOS_TASK_NOTIFY
 static void prvTestAndDecrement(lv_thread_sync_t *pxCond, uint32_t ulLocalWaitingThreads);
 #endif
@@ -101,17 +121,52 @@ lv_result_t lv_thread_init(lv_thread_t *pxThread, const char *const name,
     BaseType_t xStatus;
 
 #ifdef ESP_PLATFORM
-    /* Use xTaskCreatePinnedToCore with tskNO_AFFINITY so the draw thread is
-     * unpinned and the SMP scheduler can place it on either core.
-     * Stack is allocated from internal SRAM (original upstream behaviour). */
+    /* Allocate a bootstrap struct so we can block until the new task has
+     * executed its first instruction on either core.  This guarantees
+     * thread_dsc->inited == true before lv_draw_sw_init() returns, avoiding
+     * the dispatch() / lv_draw_dispatch_wait_for_request() deadlock on SMP
+     * where a plain taskYIELD() only yields the calling core. */
+    lv_thread_boot_t *pxBoot = lv_malloc(sizeof(lv_thread_boot_t));
+    if(pxBoot == NULL) {
+        LV_LOG_ERROR("lv_malloc(lv_thread_boot_t) failed for '%s'!", name);
+        return LV_RESULT_INVALID;
+    }
+    pxBoot->pxThread  = pxThread;
+    pxBoot->xReadySem = xSemaphoreCreateBinary();
+    if(pxBoot->xReadySem == NULL) {
+        LV_LOG_ERROR("xSemaphoreCreateBinary failed for '%s'!", name);
+        lv_free(pxBoot);
+        return LV_RESULT_INVALID;
+    }
+
     xStatus = xTaskCreatePinnedToCore(
-                  prvRunThread,
+                  prvRunThreadSmp,
                   name,
                   (configSTACK_DEPTH_TYPE)usStackSize,
-                  (void *)pxThread,
+                  (void *)pxBoot,
                   tskIDLE_PRIORITY + (UBaseType_t)xSchedPriority,
                   &pxThread->xTaskHandle,
                   tskNO_AFFINITY);
+
+    if(xStatus != pdPASS) {
+        LV_LOG_ERROR("Task creation failed for '%s'!", name);
+        vSemaphoreDelete(pxBoot->xReadySem);
+        lv_free(pxBoot);
+        return LV_RESULT_INVALID;
+    }
+
+    /* Block until prvRunThreadSmp signals us — guarantees the task has started
+     * and thread_dsc->inited will be set before our caller proceeds. */
+    xSemaphoreTake(pxBoot->xReadySem, portMAX_DELAY);
+    /* pxBoot was freed by prvRunThreadSmp before the Give; xReadySem still
+     * valid here because Give happens before free on the task side. Wait —
+     * actually free is BEFORE Give would be wrong.  prvRunThreadSmp does:
+     *   1. copy boot struct to stack
+     *   2. free heap block
+     *   3. xSemaphoreGive(boot.xReadySem)   <- still valid, copied to stack
+     * So after Take returns, the semaphore handle is no longer needed. */
+    vSemaphoreDelete(pxBoot->xReadySem);
+
 #else
     xStatus = xTaskCreate(
                   prvRunThread,
@@ -120,24 +175,11 @@ lv_result_t lv_thread_init(lv_thread_t *pxThread, const char *const name,
                   (void *)pxThread,
                   tskIDLE_PRIORITY + (UBaseType_t)xSchedPriority,
                   &pxThread->xTaskHandle);
-#endif
 
     if(xStatus != pdPASS) {
         LV_LOG_ERROR("Task creation failed for '%s'!", name);
         return LV_RESULT_INVALID;
     }
-
-#ifdef ESP_PLATFORM
-    /* The draw thread sets thread_dsc->inited = true in its first instruction.
-     * lv_draw_sw.c dispatch() checks inited before signalling the thread — if
-     * false it skips the signal, then the main loop blocks in
-     * lv_draw_dispatch_wait_for_request() forever while the draw thread waits
-     * on its own sync object: deadlock on first render.
-     *
-     * The draw thread is higher priority than the caller, so a single yield
-     * gives the scheduler enough opportunity to run it through to its first
-     * lv_thread_sync_wait(), setting inited = true, before we return. */
-    taskYIELD();
 #endif
 
     return LV_RESULT_OK;
