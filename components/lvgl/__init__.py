@@ -662,7 +662,7 @@ async def to_code(configs):
 
     if CORE.build_path:
         component_dir = Path(__file__).parent
-        patch_src = component_dir / "lv_freertos_psram.c.inc"
+        patch_src = component_dir / "lv_freertos.c.inc"
         atomic_patch_src = component_dir / "atomic_h_patch.py.inc"
 
         dst_patch = CORE.relative_src_path("lv_freertos_patch.inc")
