@@ -127,6 +127,19 @@ lv_result_t lv_thread_init(lv_thread_t *pxThread, const char *const name,
         return LV_RESULT_INVALID;
     }
 
+#ifdef ESP_PLATFORM
+    /* The draw thread sets thread_dsc->inited = true in its first instruction.
+     * lv_draw_sw.c dispatch() checks inited before signalling the thread — if
+     * false it skips the signal, then the main loop blocks in
+     * lv_draw_dispatch_wait_for_request() forever while the draw thread waits
+     * on its own sync object: deadlock on first render.
+     *
+     * The draw thread is higher priority than the caller, so a single yield
+     * gives the scheduler enough opportunity to run it through to its first
+     * lv_thread_sync_wait(), setting inited = true, before we return. */
+    taskYIELD();
+#endif
+
     return LV_RESULT_OK;
 }
 
