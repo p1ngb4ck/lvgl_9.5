@@ -1,47 +1,20 @@
 /**
- * @file lv_freertos.c
+ * lv_freertos.c — patched for ESP-IDF 6.x SMP (ESP32-P4 and similar)
  *
- * Patched replacement for the upstream LVGL 9.5 lv_freertos.c.
- * Copied into the build's managed_components/lvgl__lvgl/src/osal/lv_freertos.c
- * by project_include.cmake before compilation.
+ * Minimal diff from upstream LVGL 9.5 lv_freertos.c:
  *
- * Two fixes over upstream:
+ * 1. Single global portMUX_TYPE → per-object portMUX_TYPE
+ *    Upstream uses one global critSectionMux for ALL mutex/cond init guards.
+ *    On IDF 6.x, taskENTER_CRITICAL(&mux) is a true cross-core spinlock.
+ *    Two cores initialising different objects simultaneously both spin on the
+ *    same global mux → deadlock.
+ *    Fix: embed a portMUX_TYPE inside each lv_mutex_t / lv_thread_sync_t init
+ *    guard by using a static per-type mux (one for mutexes, one for conds).
+ *    Objects of the same type still serialise but cannot deadlock across types.
  *
- * 1. ESP-IDF FreeRTOS adaptations (lv_thread_init / lv_thread_delete)
- *    Uses xTaskCreatePinnedToCore(tskNO_AFFINITY) instead of xTaskCreate so
- *    the draw thread is unpinned and the scheduler places it on whichever core
- *    is available — matching the SMP-aware behaviour expected on ESP32-P4.
- *    Stack is allocated from internal SRAM (original upstream behaviour).
- *    Declared in freertos/idf_additions.h (IDF 5.0+).
- *
- * 2. SMP concurrent-init deadlock fix (prvCheckMutexInit / prvCheckCondInit)
- *    Upstream uses a single global portMUX_TYPE critSectionMux shared across
- *    ALL lv_mutex_t and lv_thread_sync_t init calls.  On IDF 6.x SMP,
- *    taskENTER_CRITICAL(&mux) is a true cross-core spinlock.  When Core0
- *    holds it (lv_os_init initialising lv_general_mutex) and Core1 (the newly
- *    spawned draw thread) immediately calls lv_thread_sync_init ->
- *    prvCheckCondInit -> taskENTER_CRITICAL on the SAME global mux, both cores
- *    deadlock permanently: silent boot hang, 0xa5a5a5a5 stack fill.
- *
- *    Fix: replace the global spinlock with lock-free init using a three-state
- *    xIsInitialized field and GCC __atomic built-ins:
- *      0 (pdFALSE)  = uninitialised
- *      2            = init claimed by one core, in progress
- *      1 (pdTRUE)   = fully initialised
- *    The core that wins the CAS(0->2) does the init and stores pdTRUE.
- *    Any other core that races spins briefly (taskYIELD loop) until pdTRUE.
- *    The spin is bounded: just FreeRTOS semaphore creation, no blocking.
- *    No shared spinlock, no cross-object contention, deadlock impossible.
- *
- *    For the LV_USE_FREERTOS_TASK_NOTIFY path (lv_thread_sync_wait/signal):
- *    xTaskToNotify and xSyncSignal are accessed via __atomic_exchange_n /
- *    __atomic_store_n with __ATOMIC_SEQ_CST, replacing the global-spinlock
- *    critical sections there too.
- */
-
-/**
- * Copyright 2023 NXP
- * SPDX-License-Identifier: MIT
+ * 2. xTaskCreate → xTaskCreatePinnedToCore(tskNO_AFFINITY)
+ *    On IDF 6.x the SMP scheduler requires the task affinity argument.
+ *    tskNO_AFFINITY lets the scheduler pick the best core.
  */
 
 /*********************
@@ -50,59 +23,63 @@
 #include "lv_os_private.h"
 #if LV_USE_OS == LV_OS_FREERTOS
 
-#ifdef ESP_PLATFORM
-#include "freertos/idf_additions.h"  /* xTaskCreatePinnedToCore, tskNO_AFFINITY */
-#endif
-
-#include "freertos/atomic.h"
+#include "atomic.h"
 
 #include "../tick/lv_tick.h"
 #include "../misc/lv_log.h"
 #include "../core/lv_global.h"
+
+#ifdef ESP_PLATFORM
+#include "freertos/idf_additions.h"  /* xTaskCreatePinnedToCore, tskNO_AFFINITY */
+#endif
 
 /*********************
  *      DEFINES
  *********************/
 
 #define ulMAX_COUNT 10U
+
 #define globals LV_GLOBAL_DEFAULT()
 
-/* Three-state values for xIsInitialized */
-#define LV_INIT_UNCLAIMED  ((BaseType_t)0)   /* == pdFALSE */
-#define LV_INIT_CLAIMED    ((BaseType_t)2)   /* in progress, claimed by one core */
-#define LV_INIT_DONE       ((BaseType_t)1)   /* == pdTRUE, fully initialised */
+/**********************
+ *      TYPEDEFS
+ **********************/
+
+/**********************
+ *  STATIC VARIABLES
+ **********************/
+
+#ifdef ESP_PLATFORM
+    /* Separate per-type muxes so mutex-init and cond-init never share a lock.
+     * Still serialises concurrent init of the same type, which is safe. */
+    static portMUX_TYPE s_mutex_init_mux = portMUX_INITIALIZER_UNLOCKED;
+    static portMUX_TYPE s_cond_init_mux  = portMUX_INITIALIZER_UNLOCKED;
+
+    #define _enter_mutex_critical()   taskENTER_CRITICAL(&s_mutex_init_mux)
+    #define _exit_mutex_critical()    taskEXIT_CRITICAL(&s_mutex_init_mux)
+    #define _enter_cond_critical()    taskENTER_CRITICAL(&s_cond_init_mux)
+    #define _exit_cond_critical()     taskEXIT_CRITICAL(&s_cond_init_mux)
+    #define _enter_critical_isr()     taskENTER_CRITICAL_FROM_ISR()
+    #define _exit_critical_isr(x)     taskEXIT_CRITICAL_FROM_ISR(x)
+#else
+    #define _enter_mutex_critical()   taskENTER_CRITICAL()
+    #define _exit_mutex_critical()    taskEXIT_CRITICAL()
+    #define _enter_cond_critical()    taskENTER_CRITICAL()
+    #define _exit_cond_critical()     taskEXIT_CRITICAL()
+    #define _enter_critical_isr()     taskENTER_CRITICAL_FROM_ISR()
+    #define _exit_critical_isr(x)     taskEXIT_CRITICAL_FROM_ISR(x)
+#endif
 
 /**********************
  *  STATIC PROTOTYPES
  **********************/
 
-#ifndef ESP_PLATFORM
 static void prvRunThread(void *pxArg);
-#endif
+static void prvMutexInit(lv_mutex_t *pxMutex);
 static void prvCheckMutexInit(lv_mutex_t *pxMutex);
 static void prvCondInit(lv_thread_sync_t *pxCond);
 static void prvCheckCondInit(lv_thread_sync_t *pxCond);
 static void prvCheckCondInitIsr(lv_thread_sync_t *pxCond);
-
-#ifdef ESP_PLATFORM
-/* Bootstrap wrapper: carries real thread ptr + a semaphore that lv_thread_init
- * blocks on until the new task has executed its first instruction.  Ensures
- * thread_dsc->inited is set before the first dispatch() call on SMP targets
- * where taskYIELD() only yields the calling core. */
-typedef struct {
-    lv_thread_t       *pxThread;
-    SemaphoreHandle_t  xReadySem;
-} lv_thread_boot_t;
-
-static void prvRunThreadSmp(void *pxArg)
-{
-    lv_thread_boot_t boot = *(lv_thread_boot_t *)pxArg;
-    lv_free(pxArg);
-    xSemaphoreGive(boot.xReadySem);   /* unblock lv_thread_init */
-    boot.pxThread->pvStartRoutine((void *)boot.pxThread->pTaskArg);
-    vTaskDelete(NULL);
-}
-#endif
 
 #if !LV_USE_FREERTOS_TASK_NOTIFY
 static void prvTestAndDecrement(lv_thread_sync_t *pxCond, uint32_t ulLocalWaitingThreads);
@@ -120,69 +97,29 @@ lv_result_t lv_thread_init(lv_thread_t *pxThread, const char *const name,
     pxThread->pTaskArg = xAttr;
     pxThread->pvStartRoutine = pvStartRoutine;
 
-    BaseType_t xStatus;
-
 #ifdef ESP_PLATFORM
-    /* Allocate a bootstrap struct so we can block until the new task has
-     * executed its first instruction on either core.  This guarantees
-     * thread_dsc->inited == true before lv_draw_sw_init() returns, avoiding
-     * the dispatch() / lv_draw_dispatch_wait_for_request() deadlock on SMP
-     * where a plain taskYIELD() only yields the calling core. */
-    lv_thread_boot_t *pxBoot = lv_malloc(sizeof(lv_thread_boot_t));
-    if(pxBoot == NULL) {
-        LV_LOG_ERROR("lv_malloc(lv_thread_boot_t) failed for '%s'!", name);
-        return LV_RESULT_INVALID;
-    }
-    pxBoot->pxThread  = pxThread;
-    pxBoot->xReadySem = xSemaphoreCreateBinary();
-    if(pxBoot->xReadySem == NULL) {
-        LV_LOG_ERROR("xSemaphoreCreateBinary failed for '%s'!", name);
-        lv_free(pxBoot);
-        return LV_RESULT_INVALID;
-    }
-
-    xStatus = xTaskCreatePinnedToCore(
-                  prvRunThreadSmp,
-                  name,
-                  (configSTACK_DEPTH_TYPE)usStackSize,
-                  (void *)pxBoot,
-                  tskIDLE_PRIORITY + (UBaseType_t)xSchedPriority,
-                  &pxThread->xTaskHandle,
-                  tskNO_AFFINITY);
-
-    if(xStatus != pdPASS) {
-        LV_LOG_ERROR("Task creation failed for '%s'!", name);
-        vSemaphoreDelete(pxBoot->xReadySem);
-        lv_free(pxBoot);
-        return LV_RESULT_INVALID;
-    }
-
-    /* Block until prvRunThreadSmp signals us — guarantees the task has started
-     * and thread_dsc->inited will be set before our caller proceeds. */
-    xSemaphoreTake(pxBoot->xReadySem, portMAX_DELAY);
-    /* pxBoot was freed by prvRunThreadSmp before the Give; xReadySem still
-     * valid here because Give happens before free on the task side. Wait —
-     * actually free is BEFORE Give would be wrong.  prvRunThreadSmp does:
-     *   1. copy boot struct to stack
-     *   2. free heap block
-     *   3. xSemaphoreGive(boot.xReadySem)   <- still valid, copied to stack
-     * So after Take returns, the semaphore handle is no longer needed. */
-    vSemaphoreDelete(pxBoot->xReadySem);
-
+    BaseType_t xStatus = xTaskCreatePinnedToCore(
+                             prvRunThread,
+                             name,
+                             (configSTACK_DEPTH_TYPE)usStackSize,
+                             (void *)pxThread,
+                             tskIDLE_PRIORITY + (UBaseType_t)xSchedPriority,
+                             &pxThread->xTaskHandle,
+                             tskNO_AFFINITY);
 #else
-    xStatus = xTaskCreate(
-                  prvRunThread,
-                  name,
-                  (configSTACK_DEPTH_TYPE)(usStackSize / sizeof(StackType_t)),
-                  (void *)pxThread,
-                  tskIDLE_PRIORITY + (UBaseType_t)xSchedPriority,
-                  &pxThread->xTaskHandle);
+    BaseType_t xStatus = xTaskCreate(
+                             prvRunThread,
+                             name,
+                             (configSTACK_DEPTH_TYPE)(usStackSize / sizeof(StackType_t)),
+                             (void *)pxThread,
+                             tskIDLE_PRIORITY + (UBaseType_t)xSchedPriority,
+                             &pxThread->xTaskHandle);
+#endif
 
     if(xStatus != pdPASS) {
-        LV_LOG_ERROR("Task creation failed for '%s'!", name);
+        LV_LOG_ERROR("xTaskCreate failed!");
         return LV_RESULT_INVALID;
     }
-#endif
 
     return LV_RESULT_OK;
 }
@@ -203,7 +140,8 @@ lv_result_t lv_mutex_lock(lv_mutex_t *pxMutex)
 {
     prvCheckMutexInit(pxMutex);
 
-    if(xSemaphoreTakeRecursive(pxMutex->xMutex, portMAX_DELAY) != pdTRUE) {
+    BaseType_t xStatus = xSemaphoreTakeRecursive(pxMutex->xMutex, portMAX_DELAY);
+    if(xStatus != pdTRUE) {
         LV_LOG_ERROR("xSemaphoreTakeRecursive failed!");
         return LV_RESULT_INVALID;
     }
@@ -215,7 +153,8 @@ lv_result_t lv_mutex_lock_isr(lv_mutex_t *pxMutex)
     prvCheckMutexInit(pxMutex);
 
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    if(xSemaphoreTakeFromISR(pxMutex->xMutex, &xHigherPriorityTaskWoken) != pdTRUE) {
+    BaseType_t xStatus = xSemaphoreTakeFromISR(pxMutex->xMutex, &xHigherPriorityTaskWoken);
+    if(xStatus != pdTRUE) {
         LV_LOG_ERROR("xSemaphoreTakeFromISR failed!");
         return LV_RESULT_INVALID;
     }
@@ -227,7 +166,8 @@ lv_result_t lv_mutex_unlock(lv_mutex_t *pxMutex)
 {
     prvCheckMutexInit(pxMutex);
 
-    if(xSemaphoreGiveRecursive(pxMutex->xMutex) != pdTRUE) {
+    BaseType_t xStatus = xSemaphoreGiveRecursive(pxMutex->xMutex);
+    if(xStatus != pdTRUE) {
         LV_LOG_ERROR("xSemaphoreGiveRecursive failed!");
         return LV_RESULT_INVALID;
     }
@@ -236,10 +176,10 @@ lv_result_t lv_mutex_unlock(lv_mutex_t *pxMutex)
 
 lv_result_t lv_mutex_delete(lv_mutex_t *pxMutex)
 {
-    if(__atomic_load_n(&pxMutex->xIsInitialized, __ATOMIC_ACQUIRE) != LV_INIT_DONE)
+    if(pxMutex->xIsInitialized == pdFALSE)
         return LV_RESULT_INVALID;
     vSemaphoreDelete(pxMutex->xMutex);
-    __atomic_store_n(&pxMutex->xIsInitialized, LV_INIT_UNCLAIMED, __ATOMIC_RELEASE);
+    pxMutex->xIsInitialized = pdFALSE;
     return LV_RESULT_OK;
 }
 
@@ -258,27 +198,22 @@ lv_result_t lv_thread_sync_wait(lv_thread_sync_t *pxCond)
 #if LV_USE_FREERTOS_TASK_NOTIFY
     TaskHandle_t xCurrentTaskHandle = xTaskGetCurrentTaskHandle();
 
-    /* 1. Try to consume a pre-existing signal. */
-    BaseType_t xSyncSignal = __atomic_exchange_n(&pxCond->xSyncSignal, pdFALSE, __ATOMIC_SEQ_CST);
-    if(xSyncSignal == pdFALSE) {
-        /* 2. No pre-existing signal: register to be notified. */
-        __atomic_store_n(&pxCond->xTaskToNotify, xCurrentTaskHandle, __ATOMIC_SEQ_CST);
+    _enter_cond_critical();
+    BaseType_t xSyncSignal = pxCond->xSyncSignal;
+    pxCond->xSyncSignal = pdFALSE;
+    if(xSyncSignal == pdFALSE)
+        pxCond->xTaskToNotify = xCurrentTaskHandle;
+    _exit_cond_critical();
 
-        /* 3. Re-check: signal may have arrived in the gap above. */
-        xSyncSignal = __atomic_exchange_n(&pxCond->xSyncSignal, pdFALSE, __ATOMIC_SEQ_CST);
-        if(xSyncSignal == pdFALSE) {
-            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        }
-        else {
-            /* Signal arrived in gap; clear registration so sender won't also notify. */
-            __atomic_store_n(&pxCond->xTaskToNotify, NULL, __ATOMIC_SEQ_CST);
-        }
-    }
+    if(xSyncSignal == pdFALSE)
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 #else
+    uint32_t ulLocalWaitingThreads;
+
     xSemaphoreTake(pxCond->xSyncMutex, portMAX_DELAY);
 
     while(!pxCond->xSyncSignal) {
-        uint32_t ulLocalWaitingThreads = Atomic_Increment_u32(&pxCond->ulWaitingThreads);
+        ulLocalWaitingThreads = Atomic_Increment_u32(&pxCond->ulWaitingThreads);
 
         BaseType_t xMutexStatus = xSemaphoreGive(pxCond->xSyncMutex);
         if(xMutexStatus == pdTRUE) {
@@ -309,13 +244,15 @@ lv_result_t lv_thread_sync_signal(lv_thread_sync_t *pxCond)
     prvCheckCondInit(pxCond);
 
 #if LV_USE_FREERTOS_TASK_NOTIFY
-    TaskHandle_t xTaskToNotify = __atomic_exchange_n(&pxCond->xTaskToNotify, NULL, __ATOMIC_SEQ_CST);
-    if(xTaskToNotify != NULL) {
+    _enter_cond_critical();
+    TaskHandle_t xTaskToNotify = pxCond->xTaskToNotify;
+    pxCond->xTaskToNotify = NULL;
+    if(xTaskToNotify == NULL)
+        pxCond->xSyncSignal = pdTRUE;
+    _exit_cond_critical();
+
+    if(xTaskToNotify != NULL)
         xTaskNotifyGive(xTaskToNotify);
-    }
-    else {
-        __atomic_store_n(&pxCond->xSyncSignal, pdTRUE, __ATOMIC_SEQ_CST);
-    }
 #else
     xSemaphoreTake(pxCond->xSyncMutex, portMAX_DELAY);
     pxCond->xSyncSignal = pdTRUE;
@@ -324,9 +261,8 @@ lv_result_t lv_thread_sync_signal(lv_thread_sync_t *pxCond)
     while(ulLocalWaitingThreads > 0) {
         if(ATOMIC_COMPARE_AND_SWAP_SUCCESS == Atomic_CompareAndSwap_u32(
                &pxCond->ulWaitingThreads, 0, ulLocalWaitingThreads)) {
-            for(uint32_t i = 0; i < ulLocalWaitingThreads; i++) {
+            for(uint32_t i = 0; i < ulLocalWaitingThreads; i++)
                 xSemaphoreGive(pxCond->xCondWaitSemaphore);
-            }
             break;
         }
         ulLocalWaitingThreads = pxCond->ulWaitingThreads;
@@ -345,7 +281,7 @@ lv_result_t lv_thread_sync_delete(lv_thread_sync_t *pxCond)
     pxCond->ulWaitingThreads = 0;
 #endif
     pxCond->xSyncSignal = pdFALSE;
-    __atomic_store_n(&pxCond->xIsInitialized, LV_INIT_UNCLAIMED, __ATOMIC_RELEASE);
+    pxCond->xIsInitialized = pdFALSE;
     return LV_RESULT_OK;
 }
 
@@ -356,23 +292,26 @@ lv_result_t lv_thread_sync_signal_isr(lv_thread_sync_t *pxCond)
     prvCheckCondInitIsr(pxCond);
 
 #if LV_USE_FREERTOS_TASK_NOTIFY
-    TaskHandle_t xTaskToNotify = __atomic_exchange_n(&pxCond->xTaskToNotify, NULL, __ATOMIC_SEQ_CST);
+    UBaseType_t mask = _enter_critical_isr();
+    TaskHandle_t xTaskToNotify = pxCond->xTaskToNotify;
+    pxCond->xTaskToNotify = NULL;
+    if(xTaskToNotify == NULL)
+        pxCond->xSyncSignal = pdTRUE;
+    _exit_critical_isr(mask);
+
     if(xTaskToNotify != NULL) {
         vTaskNotifyGiveFromISR(xTaskToNotify, &xHigherPriorityTaskWoken);
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
-    else {
-        __atomic_store_n(&pxCond->xSyncSignal, pdTRUE, __ATOMIC_SEQ_CST);
-    }
 #else
-    UBaseType_t uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();
+    UBaseType_t mask = _enter_critical_isr();
     pxCond->xSyncSignal = pdTRUE;
     BaseType_t xAnyHigherPriorityTaskWoken = pdFALSE;
     for(uint32_t i = 0; i < pxCond->ulWaitingThreads; i++) {
         xSemaphoreGiveFromISR(pxCond->xCondWaitSemaphore, &xAnyHigherPriorityTaskWoken);
         xHigherPriorityTaskWoken |= xAnyHigherPriorityTaskWoken;
     }
-    taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);
+    _exit_critical_isr(mask);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 #endif
 
@@ -415,46 +354,36 @@ void lv_sleep_ms(uint32_t ms)
  *   STATIC FUNCTIONS
  **********************/
 
-#ifndef ESP_PLATFORM
 static void prvRunThread(void *pxArg)
 {
     lv_thread_t *pxThread = (lv_thread_t *)pxArg;
     pxThread->pvStartRoutine((void *)pxThread->pTaskArg);
     vTaskDelete(NULL);
 }
-#endif
+
+static void prvMutexInit(lv_mutex_t *pxMutex)
+{
+    pxMutex->xMutex = xSemaphoreCreateRecursiveMutex();
+    if(pxMutex->xMutex == NULL) {
+        LV_LOG_ERROR("xSemaphoreCreateRecursiveMutex failed!");
+        return;
+    }
+    pxMutex->xIsInitialized = pdTRUE;
+}
 
 static void prvCheckMutexInit(lv_mutex_t *pxMutex)
 {
-    /* Fast path: fully initialised. Acquire barrier ensures xMutex is visible. */
-    if(__atomic_load_n(&pxMutex->xIsInitialized, __ATOMIC_ACQUIRE) == LV_INIT_DONE)
-        return;
-
-    /* Try to claim init: CAS(UNCLAIMED -> CLAIMED). Only one core wins. */
-    BaseType_t xExpected = LV_INIT_UNCLAIMED;
-    if(__atomic_compare_exchange_n(&pxMutex->xIsInitialized, &xExpected,
-                                   LV_INIT_CLAIMED, /*weak=*/0,
-                                   __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
-        SemaphoreHandle_t xNew = xSemaphoreCreateRecursiveMutex();
-        if(xNew == NULL) {
-            LV_LOG_ERROR("xSemaphoreCreateRecursiveMutex failed!");
-            __atomic_store_n(&pxMutex->xIsInitialized, LV_INIT_UNCLAIMED, __ATOMIC_RELEASE);
-            return;
-        }
-        pxMutex->xMutex = xNew;
-        /* Release store: pairs with acquire loads; xMutex visible after this. */
-        __atomic_store_n(&pxMutex->xIsInitialized, LV_INIT_DONE, __ATOMIC_RELEASE);
-    }
-    else {
-        /* Another core claimed init. Spin until it completes (bounded). */
-        while(__atomic_load_n(&pxMutex->xIsInitialized, __ATOMIC_ACQUIRE) != LV_INIT_DONE) {
-            taskYIELD();
-        }
+    if(pxMutex->xIsInitialized == pdFALSE) {
+        _enter_mutex_critical();
+        if(pxMutex->xIsInitialized == pdFALSE)
+            prvMutexInit(pxMutex);
+        _exit_mutex_critical();
     }
 }
 
 static void prvCondInit(lv_thread_sync_t *pxCond)
 {
+    pxCond->xIsInitialized = pdTRUE;
     pxCond->xSyncSignal = pdFALSE;
 #if LV_USE_FREERTOS_TASK_NOTIFY
     pxCond->xTaskToNotify = NULL;
@@ -476,29 +405,17 @@ static void prvCondInit(lv_thread_sync_t *pxCond)
 
 static void prvCheckCondInit(lv_thread_sync_t *pxCond)
 {
-    /* Fast path. */
-    if(__atomic_load_n(&pxCond->xIsInitialized, __ATOMIC_ACQUIRE) == LV_INIT_DONE)
-        return;
-
-    /* Try to claim init. */
-    BaseType_t xExpected = LV_INIT_UNCLAIMED;
-    if(__atomic_compare_exchange_n(&pxCond->xIsInitialized, &xExpected,
-                                   LV_INIT_CLAIMED, /*weak=*/0,
-                                   __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
-        prvCondInit(pxCond);
-        __atomic_store_n(&pxCond->xIsInitialized, LV_INIT_DONE, __ATOMIC_RELEASE);
-    }
-    else {
-        /* Spin-wait for winning core to finish. */
-        while(__atomic_load_n(&pxCond->xIsInitialized, __ATOMIC_ACQUIRE) != LV_INIT_DONE) {
-            taskYIELD();
-        }
+    if(pxCond->xIsInitialized == pdFALSE) {
+        _enter_cond_critical();
+        if(pxCond->xIsInitialized == pdFALSE)
+            prvCondInit(pxCond);
+        _exit_cond_critical();
     }
 }
 
 static void prvCheckCondInitIsr(lv_thread_sync_t *pxCond)
 {
-    LV_ASSERT_MSG(__atomic_load_n(&pxCond->xIsInitialized, __ATOMIC_ACQUIRE) == LV_INIT_DONE,
+    LV_ASSERT_MSG(pxCond->xIsInitialized == pdTRUE,
                   "lv_thread_sync_signal_isr called before lv_thread_sync_init");
 }
 
