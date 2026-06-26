@@ -76,7 +76,9 @@
  *  STATIC PROTOTYPES
  **********************/
 
+#ifndef ESP_PLATFORM
 static void prvRunThread(void *pxArg);
+#endif
 static void prvCheckMutexInit(lv_mutex_t *pxMutex);
 static void prvCondInit(lv_thread_sync_t *pxCond);
 static void prvCheckCondInit(lv_thread_sync_t *pxCond);
@@ -413,12 +415,14 @@ void lv_sleep_ms(uint32_t ms)
  *   STATIC FUNCTIONS
  **********************/
 
+#ifndef ESP_PLATFORM
 static void prvRunThread(void *pxArg)
 {
     lv_thread_t *pxThread = (lv_thread_t *)pxArg;
     pxThread->pvStartRoutine((void *)pxThread->pTaskArg);
     vTaskDelete(NULL);
 }
+#endif
 
 static void prvCheckMutexInit(lv_mutex_t *pxMutex)
 {
