@@ -1009,8 +1009,28 @@ void LvglComponent::setup() {
       this->flush_queue_ = xQueueCreate(2, sizeof(FlushJob));
       this->flush_done_sem_ = xSemaphoreCreateCounting(8, 0);
       if (this->flush_queue_ != nullptr && this->flush_done_sem_ != nullptr) {
-        BaseType_t ok = xTaskCreatePinnedToCore(&LvglComponent::flush_task_entry_, "lvgl_flush", 8192, this,
-                                                 5, reinterpret_cast<TaskHandle_t *>(&this->flush_task_), 1);
+        /* Allocate TCB + stack from internal SRAM so the flush task's TCB is
+         * never in PSRAM. With CONFIG_SPIRAM_USE_MALLOC, pvPortMalloc routes
+         * to PSRAM; the FreeRTOS tick hook accesses the TCB from ISR context,
+         * which triggers esp_psram_mspi_register_isr abort on ESP32-P4/IDF 6.x. */
+        constexpr size_t FLUSH_STACK = 8192;
+        struct FlushTaskMem {
+          StaticTask_t tcb;
+          StackType_t  stack[FLUSH_STACK / sizeof(StackType_t)];
+        };
+        auto *ftm = static_cast<FlushTaskMem *>(
+            heap_caps_malloc(sizeof(FlushTaskMem), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+        this->flush_task_mem_ = ftm;
+        TaskHandle_t flush_handle = nullptr;
+        BaseType_t ok = pdFAIL;
+        if (ftm != nullptr) {
+          flush_handle = xTaskCreateStaticPinnedToCore(
+              &LvglComponent::flush_task_entry_, "lvgl_flush",
+              FLUSH_STACK / sizeof(StackType_t), this, 5,
+              ftm->stack, &ftm->tcb, 1);
+          ok = (flush_handle != nullptr) ? pdPASS : pdFAIL;
+          this->flush_task_ = flush_handle;
+        }
         if (ok == pdPASS) {
           this->async_flush_ = true;
           lv_display_set_flush_wait_cb(this->disp_, &LvglComponent::flush_wait_cb_);
