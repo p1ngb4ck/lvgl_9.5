@@ -1343,11 +1343,9 @@ void lv_mem_monitor_core(lv_mem_monitor_t *mon_p) { memset(mon_p, 0, sizeof(lv_m
 
 #endif
 #ifdef USE_ESP32
-static unsigned cap_bits = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;  // NOLINT
-
 void lv_mem_monitor_core(lv_mem_monitor_t *mon_p) {
   multi_heap_info_t heap_info;
-  heap_caps_get_info(&heap_info, cap_bits);
+  heap_caps_get_info(&heap_info, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   mon_p->total_size = heap_info.total_allocated_bytes + heap_info.total_free_bytes;
   mon_p->free_size = heap_info.total_free_bytes;
   mon_p->max_used = heap_info.total_allocated_bytes;
@@ -1359,32 +1357,16 @@ void lv_mem_monitor_core(lv_mem_monitor_t *mon_p) {
 }
 
 void *lv_malloc_core(size_t size) {
-  void *ptr;
-  // Use 64-byte alignment for optimal ESP32 PSRAM/cache performance.
-  // Note: LV_DRAW_BUF_ALIGN is set to 4 to avoid LVGL warnings from
-  // internal stack/static buffers, but heap allocations use 64-byte alignment.
   constexpr size_t LVGL_ALIGNMENT = 64;
 
-  // BUGFIX: Don't modify global cap_bits - use local variable
-  unsigned caps = cap_bits;
+  // Internal SRAM first — avoids MSPI bus conflicts during draw thread access.
+  // PSRAM is used as fallback for large allocations that don't fit in internal RAM.
+  void *ptr = heap_caps_aligned_alloc(LVGL_ALIGNMENT, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  if (ptr == nullptr)
+    ptr = heap_caps_aligned_alloc(LVGL_ALIGNMENT, size, MALLOC_CAP_SPIRAM);
 
-  // Try PSRAM first
-  ptr = heap_caps_aligned_alloc(LVGL_ALIGNMENT, size, caps);
-  if (ptr == nullptr) {
-    // Fallback to internal RAM if PSRAM allocation fails
-    caps = MALLOC_CAP_8BIT;
-    ptr = heap_caps_aligned_alloc(LVGL_ALIGNMENT, size, caps);
-  }
-
-  if (ptr == nullptr) {
+  if (ptr == nullptr)
     ESP_LOGE(esphome::lvgl::TAG, "Failed to allocate %zu bytes (64-byte aligned)", size);
-    return nullptr;
-  }
-
-  // Log only very large buffers (>1MB) for debugging
-  if (size > 1000000) {
-    ESP_LOGI(esphome::lvgl::TAG, "Large buffer allocated: %zu bytes at %p", size, ptr);
-  }
 
   return ptr;
 }
