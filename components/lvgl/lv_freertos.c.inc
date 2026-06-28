@@ -17,6 +17,19 @@
  *    routing (SPIRAM_USE_MALLOC would otherwise push the stack to PSRAM, which
  *    is too slow for the draw thread and triggers MSPI ISR conflicts on P4).
  *    tskNO_AFFINITY lets the SMP scheduler choose the core.
+ *
+ * 3. xSemaphoreCreate* → xSemaphoreCreate*Static (ESP_PLATFORM only)
+ *    xSemaphoreCreateRecursiveMutex(), xSemaphoreCreateCounting(), and
+ *    xSemaphoreCreateMutex() all call pvPortMalloc() to allocate their Queue
+ *    Control Block (QCB).  With CONFIG_SPIRAM_USE_MALLOC, those QCBs end up in
+ *    PSRAM.  FreeRTOS ISR context (tick ISR, scheduler) touches QCBs whenever a
+ *    task is blocked on a semaphore — so the first time lv_thread_sync_wait()
+ *    blocks the draw thread, the tick ISR accesses a PSRAM QCB and the ROM
+ *    mspi_psram_isr_handler_wrapper fires abort().
+ *    Fix: allocate StaticSemaphore_t from heap_caps_malloc(MALLOC_CAP_INTERNAL)
+ *    and use the *Static creation variants.  For static semaphores the handle
+ *    equals the StaticSemaphore_t pointer (FreeRTOS queue.c line 441), so
+ *    heap_caps_free(handle) cleanly reclaims the buffer on delete.
  */
 
 /*********************
@@ -236,7 +249,14 @@ lv_result_t lv_mutex_delete(lv_mutex_t *pxMutex)
 {
     if(pxMutex->xIsInitialized == pdFALSE)
         return LV_RESULT_INVALID;
+#ifdef ESP_PLATFORM
+    /* vSemaphoreDelete does NOT free static QCBs (ucStaticallyAllocated==pdTRUE).
+     * The handle equals the StaticSemaphore_t * we heap_caps_malloc'd, so free it. */
     vSemaphoreDelete(pxMutex->xMutex);
+    heap_caps_free(pxMutex->xMutex);
+#else
+    vSemaphoreDelete(pxMutex->xMutex);
+#endif
     pxMutex->xIsInitialized = pdFALSE;
     return LV_RESULT_OK;
 }
@@ -334,8 +354,17 @@ lv_result_t lv_thread_sync_signal(lv_thread_sync_t *pxCond)
 lv_result_t lv_thread_sync_delete(lv_thread_sync_t *pxCond)
 {
 #if !LV_USE_FREERTOS_TASK_NOTIFY
+#ifdef ESP_PLATFORM
+    /* vSemaphoreDelete does not free static QCBs; the handles are the
+     * heap_caps_malloc'd StaticSemaphore_t pointers, so free them too. */
+    vSemaphoreDelete(pxCond->xCondWaitSemaphore);
+    heap_caps_free(pxCond->xCondWaitSemaphore);
+    vSemaphoreDelete(pxCond->xSyncMutex);
+    heap_caps_free(pxCond->xSyncMutex);
+#else
     vSemaphoreDelete(pxCond->xCondWaitSemaphore);
     vSemaphoreDelete(pxCond->xSyncMutex);
+#endif
     pxCond->ulWaitingThreads = 0;
 #endif
     pxCond->xSyncSignal = pdFALSE;
@@ -421,11 +450,29 @@ static void prvRunThread(void *pxArg)
 
 static void prvMutexInit(lv_mutex_t *pxMutex)
 {
+#ifdef ESP_PLATFORM
+    /* Allocate the QCB from internal SRAM so FreeRTOS ISR context never
+     * touches PSRAM (CONFIG_SPIRAM_USE_MALLOC routes pvPortMalloc to PSRAM). */
+    StaticSemaphore_t *pxBuf = (StaticSemaphore_t *)heap_caps_malloc(
+                                   sizeof(StaticSemaphore_t),
+                                   MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if(pxBuf == NULL) {
+        LV_LOG_ERROR("heap_caps_malloc for mutex QCB failed!");
+        return;
+    }
+    pxMutex->xMutex = xSemaphoreCreateRecursiveMutexStatic(pxBuf);
+    if(pxMutex->xMutex == NULL) {
+        heap_caps_free(pxBuf);
+        LV_LOG_ERROR("xSemaphoreCreateRecursiveMutexStatic failed!");
+        return;
+    }
+#else
     pxMutex->xMutex = xSemaphoreCreateRecursiveMutex();
     if(pxMutex->xMutex == NULL) {
         LV_LOG_ERROR("xSemaphoreCreateRecursiveMutex failed!");
         return;
     }
+#endif
     pxMutex->xIsInitialized = pdTRUE;
 }
 
@@ -446,6 +493,39 @@ static void prvCondInit(lv_thread_sync_t *pxCond)
 #if LV_USE_FREERTOS_TASK_NOTIFY
     pxCond->xTaskToNotify = NULL;
 #else
+#ifdef ESP_PLATFORM
+    /* Allocate both QCBs from internal SRAM so the tick ISR never touches PSRAM. */
+    StaticSemaphore_t *pxCountBuf = (StaticSemaphore_t *)heap_caps_malloc(
+                                        sizeof(StaticSemaphore_t),
+                                        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if(pxCountBuf == NULL) {
+        LV_LOG_ERROR("heap_caps_malloc for xCondWaitSemaphore QCB failed!");
+        return;
+    }
+    pxCond->xCondWaitSemaphore = xSemaphoreCreateCountingStatic(ulMAX_COUNT, 0U, pxCountBuf);
+    if(pxCond->xCondWaitSemaphore == NULL) {
+        heap_caps_free(pxCountBuf);
+        LV_LOG_ERROR("xSemaphoreCreateCountingStatic failed!");
+        return;
+    }
+    StaticSemaphore_t *pxMutBuf = (StaticSemaphore_t *)heap_caps_malloc(
+                                      sizeof(StaticSemaphore_t),
+                                      MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if(pxMutBuf == NULL) {
+        vSemaphoreDelete(pxCond->xCondWaitSemaphore);
+        heap_caps_free(pxCountBuf);
+        LV_LOG_ERROR("heap_caps_malloc for xSyncMutex QCB failed!");
+        return;
+    }
+    pxCond->xSyncMutex = xSemaphoreCreateMutexStatic(pxMutBuf);
+    if(pxCond->xSyncMutex == NULL) {
+        vSemaphoreDelete(pxCond->xCondWaitSemaphore);
+        heap_caps_free(pxCountBuf);
+        heap_caps_free(pxMutBuf);
+        LV_LOG_ERROR("xSemaphoreCreateMutexStatic failed!");
+        return;
+    }
+#else
     pxCond->xCondWaitSemaphore = xSemaphoreCreateCounting(ulMAX_COUNT, 0U);
     if(pxCond->xCondWaitSemaphore == NULL) {
         LV_LOG_ERROR("xSemaphoreCreateCounting failed!");
@@ -457,6 +537,7 @@ static void prvCondInit(lv_thread_sync_t *pxCond)
         vSemaphoreDelete(pxCond->xCondWaitSemaphore);
         return;
     }
+#endif
     pxCond->ulWaitingThreads = 0;
 #endif
 }
